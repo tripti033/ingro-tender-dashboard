@@ -92,7 +92,7 @@ function DashboardContent() {
   const [authority, setAuthority] = useState("All");
   const [status, setStatus] = useState("All");
   const [sortBy, setSortBy] = useState("Days Left (asc)");
-  const [hideClosed, setHideClosed] = useState(true);
+  const [hideClosed, setHideClosed] = useState(false);
 
   useEffect(() => {
     return onAuthChange(setUser);
@@ -309,7 +309,7 @@ function DashboardContent() {
         ) : (
           <div className="overflow-x-auto rounded-lg border">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 sticky top-[108px] z-30">
+              <thead className="bg-gray-50">
                 <tr className="text-left text-gray-500 font-medium">
                   <th className="px-4 py-3">NIT Number</th>
                   <th className="px-4 py-3">Title</th>
