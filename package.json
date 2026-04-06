@@ -1,10 +1,14 @@
 {
-  "name": "ingro-tender-scraper",
+  "name": "ingro-tender-dashboard",
   "version": "1.0.0",
-  "description": "BESS tender scraping and ingestion pipeline for Ingro Energy",
+  "description": "BESS tender scraping and ingestion pipeline + dashboard for Ingro Energy",
   "type": "module",
   "main": "scraper/index.js",
   "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
     "scrape": "node scraper/index.js"
   },
   "dependencies": {
@@ -12,8 +16,21 @@
     "cheerio": "^1.0.0",
     "dotenv": "^16.4.0",
     "firebase": "^12.11.0",
+    "next": "14.2.35",
     "playwright": "^1.45.0",
+    "react": "^18",
+    "react-dom": "^18",
     "rss-parser": "^3.13.0"
+  },
+  "devDependencies": {
+    "typescript": "^5",
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "postcss": "^8",
+    "tailwindcss": "^3.4.1",
+    "eslint": "^8",
+    "eslint-config-next": "14.2.35"
   },
   "engines": {
     "node": ">=20.0.0"
