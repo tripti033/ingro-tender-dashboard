@@ -4,6 +4,8 @@ import { scrapeSeci } from "./sources/seci.js";
 import { scrapeNtpc } from "./sources/ntpc.js";
 import { scrapeGuvnl } from "./sources/guvnl.js";
 import { scrapeMsedcl } from "./sources/msedcl.js";
+import { scrapeEprocure } from "./sources/eprocure.js";
+import { scrapeGem } from "./sources/gem.js";
 import { normaliseToSchema } from "./normaliser.js";
 import { deduplicate } from "./dedup.js";
 import { writeTenders, writeIngestionLog } from "./firestore.js";
@@ -15,6 +17,8 @@ const SOURCES = [
   { name: "NTPC", fn: scrapeNtpc },
   { name: "GUVNL", fn: scrapeGuvnl },
   { name: "MSEDCL", fn: scrapeMsedcl },
+  { name: "eProcure", fn: scrapeEprocure },
+  { name: "GeM", fn: scrapeGem },
 ];
 
 async function main() {

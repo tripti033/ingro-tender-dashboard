@@ -141,12 +141,14 @@ function detectTenderMode(text) {
  * Detect authority type (Central, State, PSU).
  */
 function detectAuthorityType(authority) {
-  const central = ["SECI", "NTPC", "SJVNL", "NVVN", "UJVNL"];
+  const central = ["SECI", "NTPC", "SJVNL", "NVVN", "UJVNL", "NHPC", "PGCIL", "POWERGRID", "MNRE", "CEA"];
   const state = ["GUVNL", "MSEDCL", "TNGECL", "RRVUNL", "DHBVN", "WBSEDCL", "MSETCL"];
+  const marketplace = ["eProcure", "GeM"];
 
   if (!authority) return null;
   if (central.includes(authority)) return "Central";
   if (state.includes(authority)) return "State";
+  if (marketplace.includes(authority)) return "Central";
   return "PSU";
 }
 
