@@ -1,17 +1,61 @@
 import { chromium } from "playwright";
+import { BESS_KEYWORDS } from "../keywords.js";
 
 const GEM_BIDS_URL = "https://bidplus.gem.gov.in/all-bids";
-const GEM_API_URL = "https://bidplus.gem.gov.in/all-bids-data";
 
-// Targeted search terms for the GeM search box — use the most distinctive phrases
-// (too many terms would slow the scraper; GeM search is broad so fewer terms cover more)
+// GeM search terms — keep focused, GeM search is very broad
 const SEARCH_TERMS = [
-  "battery energy storage",
-  "BESS",
-  "energy storage system",
-  "battery storage",
-  "MWh battery",
-  "grid scale battery",
+  "battery energy storage system",
+  "BESS grid",
+  "energy storage MWh",
+];
+
+// Junk items that match "battery" or "storage" but are NOT BESS-related
+const JUNK_PATTERNS = [
+  /wall clock/i,
+  /battery trolley/i,
+  /battery operated/i,
+  /battery cover/i,
+  /battery charger/i,
+  /battery lithium.*3\.6v/i,
+  /laptop battery/i,
+  /inverter battery/i,
+  /\bUPS\b/i,
+  /torch/i,
+  /warehousing/i,
+  /food.*storage/i,
+  /cold storage/i,
+  /data storage/i,
+  /storage almirah/i,
+  /storage rack/i,
+  /storage cabinet/i,
+  /storage tank/i,
+  /jute bag/i,
+  /injection/i,
+  /medicine/i,
+  /tablet/i,
+  /capsule/i,
+  /syringes/i,
+  /surgical/i,
+  /laundry/i,
+  /catering/i,
+  /stationery/i,
+  /pencil/i,
+  /tea\b/i,
+  /\bpen\b/i,
+  /welding/i,
+  /tentage/i,
+  /tailoring/i,
+  /cab.*taxi/i,
+  /transport.*monthly/i,
+  /security.*manpower/i,
+  /security.*service/i,
+  /crash.*barrier/i,
+  /search light/i,
+  /borescope/i,
+  /printing paper/i,
+  /sunflower oil/i,
+  /display board/i,
 ];
 
 const USER_AGENT =
@@ -99,6 +143,14 @@ export async function scrapeGem() {
 
             // Skip if title is too short or clearly not useful
             if (!title || title.length < 5) continue;
+
+            // Post-filter: check if the title is actually BESS/energy related
+            const fullText = `${title} ${ministry} ${department}`.toLowerCase();
+            const isBess = BESS_KEYWORDS.some((kw) => fullText.includes(kw));
+            if (!isBess) continue;
+
+            // Skip known junk items that match broad keywords like "battery" or "storage"
+            if (JUNK_PATTERNS.some((p) => p.test(title))) continue;
 
             // Parse dates
             const endDate = Array.isArray(bid.final_end_date_sort)
