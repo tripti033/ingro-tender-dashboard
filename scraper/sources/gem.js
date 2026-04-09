@@ -105,7 +105,8 @@ export async function scrapeGem() {
               ? bid.final_end_date_sort[0]
               : bid.final_end_date_sort || null;
 
-            // Build document link
+            // Build links — use bid number for the public URL
+            const bidUrl = `https://bidplus.gem.gov.in/bidlists?bidNo=${encodeURIComponent(bidNumber)}`;
             const internalId = Array.isArray(bid.b_id)
               ? bid.b_id[0]
               : bid.b_id || bid.id;
@@ -125,7 +126,7 @@ export async function scrapeGem() {
                 authority: "GeM",
                 bidDeadline: endDate,
                 documentLink: docLink,
-                sourceUrl: GEM_BIDS_URL,
+                sourceUrl: bidUrl,
                 source: "GeM",
                 description: `${ministry} | ${department}`,
               });

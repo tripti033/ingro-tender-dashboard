@@ -141,9 +141,9 @@ export async function writeTenders(tenders) {
             updates[field] = tender[field];
             hasChanges = true;
           }
-          // Always update dynamic fields
-          if (field === "daysLeft" || field === "tenderStatus") {
-            if (tender[field] !== existing[field]) {
+          // Always update dynamic fields and URLs
+          if (["daysLeft", "tenderStatus", "sourceUrl", "documentLink"].includes(field)) {
+            if (tender[field] != null && tender[field] !== existing[field]) {
               updates[field] = tender[field];
               hasChanges = true;
             }
