@@ -13,34 +13,67 @@ import { db } from "./firebase";
 export interface Tender {
   nitNumber: string;
   title: string;
-  category: string | null;
-  tenderMode: string | null;
+
+  // Basic Details
+  category: string | null;            // Standalone | FDRE | S+S | PSP | Hybrid
+  tenderMode: string | null;          // EPC | BOOT | BOO | BOT | DBOO | DBFOO | BOQ
   authority: string | null;
-  authorityType: string | null;
+  authorityType: string | null;       // Central | State | PSU
   state: string | null;
   location: string | null;
   powerMW: number | null;
   energyMWh: number | null;
   durationHours: number | null;
-  connectivityType: string | null;
-  emdAmount: number | null;
-  emdUnit: string | null;
-  vgfEligible: boolean;
+  connectivityType: string | null;    // STU / ISC | ISTS
   biddingStructure: string | null;
+  bespaSigning: string | null;
+
+  // Key Dates
+  preBidDate: Timestamp | null;
+  preBidLink: string | null;
   bidDeadline: Timestamp | null;
   emdDeadline: Timestamp | null;
-  preBidDate: Timestamp | null;
   techBidOpeningDate: Timestamp | null;
   financialBidOpeningDate: Timestamp | null;
-  bespaSigning: Timestamp | null;
-  daysLeft: number | null;
-  tenderStatus: string;
   documentLink: string | null;
-  preBidLink: string | null;
+
+  // Technical Details
+  minimumBidSize: string | null;
+  maxAllocationPerBidder: string | null;
+  gridConnected: string | null;
+  roundTripEfficiency: string | null;
+  minimumAnnualAvailability: string | null;
+  dailyCycles: number | null;
+
+  // Financial Details
+  financialClosure: string | null;
+  scodMonths: string | null;
+  gracePeriod: string | null;
+  tenderProcessingFee: number | null;
+  tenderDocumentFee: number | null;
+  vgfAmount: number | null;
+  vgfEligible: boolean;
+  emdAmount: number | null;
+  emdUnit: string | null;
+  pbgAmount: number | null;
+  successCharges: number | null;
+  paymentSecurityFund: number | null;
+  portalRegistrationFee: number | null;
+  totalCost: number | null;
+
+  // Status
+  daysLeft: number | null;
+  tenderStatus: string;               // active | closing_soon | closed | awarded
+
+  // Sources & Links
   sourceUrl: string | null;
   sources: string[];
+
+  // Team
   flags: Record<string, string>;
   notes: Record<string, string>;
+
+  // Metadata
   firstSeenAt: Timestamp | null;
   lastUpdatedAt: Timestamp | null;
 }
