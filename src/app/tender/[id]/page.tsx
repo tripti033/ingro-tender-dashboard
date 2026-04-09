@@ -399,7 +399,8 @@ function TenderDetailContent() {
             )}
           </div>
 
-          {/* Status Pipeline */}
+          {/* Status Pipeline — only show for non-terminal statuses */}
+          {!["closed", "cancelled", "awarded"].includes(t.tenderStatus) && (
           <div className="flex items-center gap-1 mt-4 overflow-x-auto pb-1">
             {STATUS_PIPELINE.map((s, i) => {
               const isActive = t.tenderStatus === s.value;
@@ -419,6 +420,7 @@ function TenderDetailContent() {
               );
             })}
           </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
