@@ -2,12 +2,7 @@ import { chromium } from "playwright";
 
 const GUVNL_URL = "https://tender.guvnl.com/";
 
-const BESS_KEYWORDS = [
-  "bess",
-  "battery energy storage",
-  "battery storage",
-  "energy storage",
-];
+import { BESS_KEYWORDS } from "../keywords.js";
 
 const USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36";

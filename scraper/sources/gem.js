@@ -3,10 +3,15 @@ import { chromium } from "playwright";
 const GEM_BIDS_URL = "https://bidplus.gem.gov.in/all-bids";
 const GEM_API_URL = "https://bidplus.gem.gov.in/all-bids-data";
 
+// Targeted search terms for the GeM search box — use the most distinctive phrases
+// (too many terms would slow the scraper; GeM search is broad so fewer terms cover more)
 const SEARCH_TERMS = [
   "battery energy storage",
   "BESS",
   "energy storage system",
+  "battery storage",
+  "MWh battery",
+  "grid scale battery",
 ];
 
 const USER_AGENT =

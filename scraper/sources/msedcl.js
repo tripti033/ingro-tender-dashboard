@@ -3,12 +3,7 @@ import * as cheerio from "cheerio";
 
 const MSEDCL_URL = "https://www.mahadiscom.in/en/category/tenders/";
 
-const BESS_KEYWORDS = [
-  "bess",
-  "battery energy storage",
-  "battery storage",
-  "energy storage",
-];
+import { BESS_KEYWORDS } from "../keywords.js";
 
 const USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36";

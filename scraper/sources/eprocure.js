@@ -2,12 +2,16 @@ import { chromium } from "playwright";
 
 const EPROCURE_URL = "https://eprocure.gov.in/eprocure/app";
 
-// Multiple search terms to maximize coverage
+// Search terms for eProcure's title search field
 const SEARCH_TERMS = [
   "battery energy storage",
   "BESS",
   "energy storage system",
   "battery storage",
+  "MWh",
+  "grid scale battery",
+  "standalone storage",
+  "pumped storage",
 ];
 
 const USER_AGENT =

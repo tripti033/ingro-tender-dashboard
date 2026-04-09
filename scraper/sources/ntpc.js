@@ -4,12 +4,7 @@ import { chromium } from "playwright";
 const NTPC_URL =
   "https://ntpctender.ntpc.co.in/Index/Search?Type=Reg&Region=10";
 
-const BESS_KEYWORDS = [
-  "bess",
-  "battery energy storage",
-  "battery storage",
-  "energy storage",
-];
+import { BESS_KEYWORDS } from "../keywords.js";
 
 const USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36";

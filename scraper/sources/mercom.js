@@ -1,14 +1,7 @@
 import RSSParser from "rss-parser";
+import { BESS_KEYWORDS } from "../keywords.js";
 
 const FEED_URL = "https://mercomindia.com/feed/";
-
-// Keywords to filter BESS-related articles
-const BESS_KEYWORDS = [
-  "bess",
-  "battery energy storage",
-  "battery storage",
-  "energy storage",
-];
 
 // Known authorities to detect from titles
 const KNOWN_AUTHORITIES = [
