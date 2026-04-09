@@ -6,7 +6,7 @@ import { type User } from "firebase/auth";
 import { doc, getDoc, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { onAuthChange } from "@/lib/auth";
-import { updateFlag, updateNote, updateTender, type Tender } from "@/lib/firestore";
+import { updateFlag, updateNote, updateTender, getEditHistory, type Tender, type EditHistoryEntry } from "@/lib/firestore";
 import AuthGuard from "@/components/AuthGuard";
 import Navbar from "@/components/Navbar";
 
@@ -153,6 +153,9 @@ function TenderDetailContent() {
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [form, setForm] = useState<Record<string, string>>({});
 
+  // Edit history
+  const [editHistory, setEditHistory] = useState<EditHistoryEntry[]>([]);
+
   // Flag & note
   const [selectedFlag, setSelectedFlag] = useState("");
   const [flagSaved, setFlagSaved] = useState(false);
@@ -161,6 +164,13 @@ function TenderDetailContent() {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => { return onAuthChange(setUser); }, []);
+
+  // Load edit history
+  useEffect(() => {
+    if (id) {
+      getEditHistory(id).then(setEditHistory).catch(() => {});
+    }
+  }, [id]);
 
   useEffect(() => {
     (async () => {
@@ -292,12 +302,14 @@ function TenderDetailContent() {
     };
 
     try {
-      await updateTender(tender.nitNumber, updates);
+      await updateTender(tender.nitNumber, updates, tender, user?.email || "unknown", user?.uid || "");
       setTender({ ...tender, ...updates } as Tender);
       setEditing(false);
       setSaveMsg("Saved successfully");
+      // Refresh edit history
+      getEditHistory(id).then(setEditHistory).catch(() => {});
       setTimeout(() => setSaveMsg(null), 3000);
-    } catch (err) {
+    } catch {
       setSaveMsg("Failed to save. Try again.");
     } finally {
       setSaving(false);
@@ -524,6 +536,46 @@ function TenderDetailContent() {
               <Row label="First seen" value={formatShortDate(t.firstSeenAt)} />
               <Row label="Last updated" value={formatShortDate(t.lastUpdatedAt)} />
             </Section>
+
+            {/* Edit History */}
+            {editHistory.length > 0 && (
+              <Section title={`Recent Edits (${editHistory.length})`}>
+                <div className="space-y-3 max-h-80 overflow-y-auto">
+                  {editHistory.map((entry) => (
+                    <div key={entry.id} className="border-b border-gray-100 pb-3 last:border-0">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-xs font-medium text-gray-700">
+                          {entry.editedBy}
+                        </span>
+                        <span className="text-xs text-gray-400">
+                          {entry.editedAt && typeof entry.editedAt.toDate === "function"
+                            ? entry.editedAt.toDate().toLocaleDateString("en-IN", {
+                                day: "2-digit", month: "short", year: "numeric",
+                                hour: "2-digit", minute: "2-digit",
+                              })
+                            : "\u2014"}
+                        </span>
+                      </div>
+                      <div className="space-y-1">
+                        {Object.entries(entry.changes || {}).map(([field, change]) => (
+                          <div key={field} className="text-xs text-gray-500">
+                            <span className="font-medium text-gray-600">{field}</span>
+                            {": "}
+                            <span className="text-red-400 line-through">
+                              {change.from != null ? String(change.from) : "empty"}
+                            </span>
+                            {" \u2192 "}
+                            <span className="text-green-600">
+                              {change.to != null ? String(change.to) : "empty"}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Section>
+            )}
           </div>
         </div>
       </div>

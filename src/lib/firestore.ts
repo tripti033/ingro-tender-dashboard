@@ -3,6 +3,7 @@ import {
   getDocs,
   doc,
   updateDoc,
+  addDoc,
   Timestamp,
   query,
   orderBy,
@@ -101,15 +102,80 @@ export async function getTenders(): Promise<Tender[]> {
     });
 }
 
+export interface EditHistoryEntry {
+  id: string;
+  editedBy: string;        // user email
+  editedByUid: string;
+  editedAt: Timestamp;
+  changes: Record<string, { from: unknown; to: unknown }>;
+}
+
+/**
+ * Update a tender and log an edit history entry with what changed.
+ */
 export async function updateTender(
   tenderId: string,
-  data: Partial<Tender>
+  data: Partial<Tender>,
+  oldTender: Tender,
+  userEmail: string,
+  userUid: string
 ) {
   const ref = doc(db, "tenders", tenderId);
   await updateDoc(ref, {
     ...data,
     lastUpdatedAt: Timestamp.now(),
   });
+
+  // Build a diff of what changed
+  const changes: Record<string, { from: unknown; to: unknown }> = {};
+  for (const key of Object.keys(data) as (keyof Tender)[]) {
+    if (key === "lastUpdatedAt" || key === "flags" || key === "notes") continue;
+
+    const oldVal = oldTender[key];
+    const newVal = data[key];
+
+    // Compare Timestamps by converting to ms
+    const oldMs = oldVal && typeof (oldVal as { toMillis?: () => number }).toMillis === "function"
+      ? (oldVal as Timestamp).toMillis() : oldVal;
+    const newMs = newVal && typeof (newVal as { toMillis?: () => number }).toMillis === "function"
+      ? (newVal as Timestamp).toMillis() : newVal;
+
+    if (oldMs !== newMs) {
+      // Format for display — show readable values
+      const formatVal = (v: unknown) => {
+        if (v == null) return null;
+        if (typeof (v as { toDate?: () => Date }).toDate === "function") {
+          return (v as Timestamp).toDate().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+        }
+        return v;
+      };
+      changes[key] = { from: formatVal(oldVal), to: formatVal(newVal) };
+    }
+  }
+
+  // Only write history if something actually changed
+  if (Object.keys(changes).length > 0) {
+    const historyCol = collection(db, "tenders", tenderId, "editHistory");
+    await addDoc(historyCol, {
+      editedBy: userEmail,
+      editedByUid: userUid,
+      editedAt: Timestamp.now(),
+      changes,
+    });
+  }
+}
+
+/**
+ * Get edit history for a tender, most recent first.
+ */
+export async function getEditHistory(tenderId: string, max = 20): Promise<EditHistoryEntry[]> {
+  const q = query(
+    collection(db, "tenders", tenderId, "editHistory"),
+    orderBy("editedAt", "desc"),
+    limit(max)
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as EditHistoryEntry);
 }
 
 export async function updateFlag(
