@@ -101,6 +101,17 @@ export async function getTenders(): Promise<Tender[]> {
     });
 }
 
+export async function updateTender(
+  tenderId: string,
+  data: Partial<Tender>
+) {
+  const ref = doc(db, "tenders", tenderId);
+  await updateDoc(ref, {
+    ...data,
+    lastUpdatedAt: Timestamp.now(),
+  });
+}
+
 export async function updateFlag(
   tenderId: string,
   uid: string,
