@@ -6,7 +6,6 @@ import { BESS_KEYWORDS } from "../keywords.js";
 // Multiple RSS feeds and news sources for BESS industry alerts
 const RSS_FEEDS = [
   { name: "Mercom", url: "https://mercomindia.com/feed/" },
-  { name: "SaurEnergy", url: "https://www.saurenergy.com/solar-energy-news/feed" },
   { name: "PVMagazine", url: "https://www.pv-magazine-india.com/feed/" },
   { name: "ETEnergyWorld", url: "https://energy.economictimes.indiatimes.com/rss/topstories" },
 ];
@@ -24,12 +23,79 @@ const KNOWN_AUTHORITIES = [
 const USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36";
 
+// Broader keywords for industry alerts — covers BESS + solar + grid + tariff + RE
+const ALERT_KEYWORDS = [
+  ...BESS_KEYWORDS,
+  // Solar
+  "solar",
+  "solar pv",
+  "solar power",
+  "solar project",
+  "solar park",
+  "rooftop solar",
+  "floating solar",
+  // Wind
+  "wind energy",
+  "wind power",
+  "wind turbine",
+  "offshore wind",
+  // Grid / transmission
+  "grid",
+  "grid connected",
+  "grid scale",
+  "transmission",
+  "substation",
+  "power evacuation",
+  "power grid",
+  "powergrid",
+  // Tariff / regulatory
+  "tariff",
+  "power tariff",
+  "electricity tariff",
+  "tariff order",
+  "tariff petition",
+  "cerc",
+  "serc",
+  "merc",
+  "gerc",
+  // Renewable energy general
+  "renewable energy",
+  "renewable power",
+  "green energy",
+  "clean energy",
+  "re project",
+  "ipp",
+  "ppa",
+  "power purchase agreement",
+  // EPC / procurement
+  "epc",
+  "tender",
+  "bid",
+  "auction",
+  "rfp",
+  "rfs",
+  // Hydrogen / new energy
+  "green hydrogen",
+  "electrolyser",
+  // Specific orgs
+  "seci",
+  "ntpc",
+  "mnre",
+  "cea",
+  "pgcil",
+  "nhpc",
+  "ireda",
+  "discoms",
+  "discom",
+];
+
 /**
- * Check if text matches any BESS keyword (case-insensitive).
+ * Check if text matches any alert keyword (case-insensitive).
+ * Uses broader energy industry keywords, not just BESS.
  */
-function isBessRelated(text) {
+function isEnergyRelated(text) {
   const lower = text.toLowerCase();
-  return BESS_KEYWORDS.some((kw) => lower.includes(kw));
+  return ALERT_KEYWORDS.some((kw) => lower.includes(kw));
 }
 
 /**
@@ -49,7 +115,7 @@ export async function scrapeMercom() {
         const description = item.contentSnippet || item.content || "";
         const fullText = `${title} ${description}`;
 
-        if (!isBessRelated(fullText)) continue;
+        if (!isEnergyRelated(fullText)) continue;
 
         const key = title.toLowerCase().slice(0, 60);
         if (seen.has(key)) continue;
@@ -106,7 +172,7 @@ export async function scrapeMercom() {
         $(el).find(".date, .entry-date").text().trim() || null;
 
       if (!title || title.length < 15) return;
-      if (!isBessRelated(title)) return;
+      if (!isEnergyRelated(title)) return;
 
       const key = title.toLowerCase().slice(0, 60);
       if (seen.has(key)) return;
