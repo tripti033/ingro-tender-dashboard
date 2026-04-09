@@ -126,30 +126,39 @@ export async function updateTender(
     lastUpdatedAt: Timestamp.now(),
   });
 
-  // Build a diff of what changed
+  // Build a diff of what changed — skip computed/meta fields and unchanged values
+  const skipFields = new Set(["lastUpdatedAt", "flags", "notes", "daysLeft", "tenderStatus", "durationHours", "vgfEligible", "nitNumber", "sources", "firstSeenAt"]);
   const changes: Record<string, { from: unknown; to: unknown }> = {};
+
+  const formatVal = (v: unknown) => {
+    if (v == null) return null;
+    if (typeof (v as { toDate?: () => Date }).toDate === "function") {
+      return (v as Timestamp).toDate().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+    }
+    return v;
+  };
+
   for (const key of Object.keys(data) as (keyof Tender)[]) {
-    if (key === "lastUpdatedAt" || key === "flags" || key === "notes") continue;
+    if (skipFields.has(key)) continue;
 
     const oldVal = oldTender[key];
     const newVal = data[key];
 
-    // Compare Timestamps by converting to ms
-    const oldMs = oldVal && typeof (oldVal as { toMillis?: () => number }).toMillis === "function"
-      ? (oldVal as Timestamp).toMillis() : oldVal;
-    const newMs = newVal && typeof (newVal as { toMillis?: () => number }).toMillis === "function"
-      ? (newVal as Timestamp).toMillis() : newVal;
+    // Treat null and undefined as the same (both = "empty")
+    const oldNorm = oldVal ?? null;
+    const newNorm = newVal ?? null;
+
+    // Both empty — skip
+    if (oldNorm === null && newNorm === null) continue;
+
+    // Compare Timestamps by ms
+    const oldMs = oldNorm && typeof (oldNorm as { toMillis?: () => number }).toMillis === "function"
+      ? (oldNorm as Timestamp).toMillis() : oldNorm;
+    const newMs = newNorm && typeof (newNorm as { toMillis?: () => number }).toMillis === "function"
+      ? (newNorm as Timestamp).toMillis() : newNorm;
 
     if (oldMs !== newMs) {
-      // Format for display — show readable values
-      const formatVal = (v: unknown) => {
-        if (v == null) return null;
-        if (typeof (v as { toDate?: () => Date }).toDate === "function") {
-          return (v as Timestamp).toDate().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
-        }
-        return v;
-      };
-      changes[key] = { from: formatVal(oldVal), to: formatVal(newVal) };
+      changes[key] = { from: formatVal(oldNorm), to: formatVal(newNorm) };
     }
   }
 
