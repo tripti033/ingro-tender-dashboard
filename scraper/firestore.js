@@ -172,6 +172,56 @@ export async function writeTenders(tenders) {
 }
 
 /**
+ * Write Mercom alerts to the alerts collection.
+ * Uses sourceUrl as a dedup key — skip if already exists.
+ * Returns number of new alerts written.
+ */
+export async function writeAlerts(rawAlerts) {
+  const db = await initFirestore();
+  const now = Timestamp.now();
+  let written = 0;
+
+  for (const { raw, source } of rawAlerts) {
+    try {
+      // Use a slug of the title as document ID for dedup
+      const id = (raw.title || "")
+        .replace(/[^a-zA-Z0-9\s]/g, "")
+        .trim()
+        .split(/\s+/)
+        .slice(0, 8)
+        .join("-")
+        .toLowerCase()
+        .slice(0, 60);
+
+      if (!id) continue;
+
+      const docRef = doc(db, "alerts", id);
+      const existing = await getDoc(docRef);
+
+      if (!existing.exists()) {
+        await setDoc(docRef, {
+          title: raw.title || "",
+          source,
+          sourceUrl: raw.sourceUrl || raw.documentLink || null,
+          publishedAt: raw.bidDeadline ? Timestamp.fromDate(new Date(raw.bidDeadline)) : now,
+          authority: raw.authority || null,
+          powerMW: raw.powerMW || null,
+          energyMWh: raw.energyMWh || null,
+          category: raw.category || null,
+          createdAt: now,
+        });
+        written++;
+      }
+    } catch (err) {
+      console.error(`[Firestore] Alert write error: ${err.message}`);
+    }
+  }
+
+  console.log(`[Firestore] Alerts: ${written} new, ${rawAlerts.length - written} skipped`);
+  return written;
+}
+
+/**
  * Write an ingestion log entry for this scraper run.
  */
 export async function writeIngestionLog(logEntry) {

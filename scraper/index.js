@@ -8,11 +8,15 @@ import { scrapeEprocure } from "./sources/eprocure.js";
 import { scrapeGem } from "./sources/gem.js";
 import { normaliseToSchema } from "./normaliser.js";
 import { deduplicate } from "./dedup.js";
-import { writeTenders, writeIngestionLog } from "./firestore.js";
+import { writeTenders, writeAlerts, writeIngestionLog } from "./firestore.js";
 
-// All scraper sources with their names and functions
-const SOURCES = [
+// Mercom is a news/alerts source — separated from tender scrapers
+const ALERT_SOURCES = [
   { name: "Mercom", fn: scrapeMercom },
+];
+
+// Tender listing scrapers
+const SOURCES = [
   { name: "SECI", fn: scrapeSeci },
   { name: "NTPC", fn: scrapeNtpc },
   { name: "GUVNL", fn: scrapeGuvnl },
@@ -26,33 +30,46 @@ async function main() {
   console.log("=== BESS Tender Scraper — Ingro Energy ===");
   console.log(`Run started at ${new Date().toISOString()}\n`);
 
-  // Run all 5 scrapers in parallel — one failure won't stop others
-  const results = await Promise.allSettled(
-    SOURCES.map(({ name, fn }) =>
-      fn().then((tenders) => ({ name, tenders }))
-    )
-  );
+  // Run alert sources and tender sources in parallel
+  const allJobs = [
+    ...ALERT_SOURCES.map(({ name, fn }) =>
+      fn().then((items) => ({ name, items, type: "alert" }))
+    ),
+    ...SOURCES.map(({ name, fn }) =>
+      fn().then((items) => ({ name, items, type: "tender" }))
+    ),
+  ];
+  const results = await Promise.allSettled(allJobs);
 
   // Collect results and track per-source stats
   const allRawTenders = [];
+  const allRawAlerts = [];
   const sourceStats = {};
   let failedCount = 0;
   const errors = [];
 
+  const allSourceNames = [...ALERT_SOURCES, ...SOURCES].map((s) => s.name);
+
   for (let i = 0; i < results.length; i++) {
-    const sourceName = SOURCES[i].name;
+    const sourceName = allSourceNames[i];
     const result = results[i];
 
     if (result.status === "fulfilled") {
-      const { tenders } = result.value;
+      const { items, type } = result.value;
       sourceStats[sourceName] = {
-        fetched: tenders.length,
-        new: 0, // will be updated after Firestore write
+        fetched: items.length,
+        new: 0,
         errors: 0,
       };
-      allRawTenders.push(
-        ...tenders.map((t) => ({ raw: t, source: sourceName }))
-      );
+      if (type === "alert") {
+        allRawAlerts.push(
+          ...items.map((t) => ({ raw: t, source: sourceName }))
+        );
+      } else {
+        allRawTenders.push(
+          ...items.map((t) => ({ raw: t, source: sourceName }))
+        );
+      }
     } else {
       failedCount++;
       const errMsg = `${sourceName}: ${result.reason?.message || result.reason}`;
@@ -83,14 +100,25 @@ async function main() {
   const unique = deduplicate(normalised);
   console.log(`After dedup: ${unique.length} unique tenders\n`);
 
-  // Write to Firestore
+  // Write tenders to Firestore
   let writeResult = { newCount: 0, updatedCount: 0, skippedCount: 0, errors: [] };
   try {
     writeResult = await writeTenders(unique);
     errors.push(...writeResult.errors);
   } catch (err) {
-    console.error(`[Firestore] Fatal write error: ${err.message}`);
+    console.error(`[Firestore] Fatal tender write error: ${err.message}`);
     errors.push(`Firestore write error: ${err.message}`);
+  }
+
+  // Write Mercom alerts to separate collection
+  let alertsWritten = 0;
+  if (allRawAlerts.length > 0) {
+    try {
+      alertsWritten = await writeAlerts(allRawAlerts);
+    } catch (err) {
+      console.error(`[Firestore] Alert write error: ${err.message}`);
+      errors.push(`Alert write error: ${err.message}`);
+    }
   }
 
   const durationMs = Date.now() - startTime;
@@ -117,10 +145,11 @@ async function main() {
     const status = stats.errors > 0 ? "FAILED" : `${stats.fetched} found`;
     console.log(`  ${source.padEnd(10)} ${status}`);
   }
-  console.log(`\nTotal unique: ${unique.length}`);
+  console.log(`\nTenders unique: ${unique.length}`);
   console.log(`New: ${writeResult.newCount}`);
   console.log(`Updated: ${writeResult.updatedCount}`);
   console.log(`Skipped: ${writeResult.skippedCount}`);
+  console.log(`Alerts written: ${alertsWritten}`);
   if (errors.length > 0) {
     console.log(`Errors: ${errors.length}`);
     errors.forEach((e) => console.log(`  - ${e}`));

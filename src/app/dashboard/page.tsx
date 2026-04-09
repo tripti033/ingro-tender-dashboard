@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { type User } from "firebase/auth";
 import { onAuthChange } from "@/lib/auth";
-import { getTenders, updateFlag, type Tender } from "@/lib/firestore";
+import { getTenders, getAlerts, updateFlag, type Tender, type Alert } from "@/lib/firestore";
 import AuthGuard from "@/components/AuthGuard";
 import Navbar from "@/components/Navbar";
 
@@ -83,6 +83,8 @@ function DashboardContent() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [tenders, setTenders] = useState<Tender[]>([]);
+  const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [alertsOpen, setAlertsOpen] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -99,8 +101,10 @@ function DashboardContent() {
   }, []);
 
   useEffect(() => {
-    getTenders()
-      .then(setTenders)
+    Promise.all([
+      getTenders().then(setTenders),
+      getAlerts().then(setAlerts).catch(() => {}),
+    ])
       .catch(() => setError("Failed to load tenders. Please refresh."))
       .finally(() => setLoading(false));
   }, []);
@@ -288,6 +292,70 @@ function DashboardContent() {
           </span>
         </div>
       </div>
+
+      {/* Alerts bar — Mercom industry news */}
+      {alerts.length > 0 && (
+        <div className="mx-6 mt-4">
+          <button
+            onClick={() => setAlertsOpen(!alertsOpen)}
+            className="flex items-center gap-2 text-sm font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-t-lg px-4 py-2 w-full text-left hover:bg-amber-100 transition-colors"
+          >
+            <span className="text-amber-500">&#9889;</span>
+            Industry Alerts
+            <span className="text-xs font-normal text-amber-600 ml-1">
+              ({alerts.length})
+            </span>
+            <span className="ml-auto text-xs text-amber-400">
+              {alertsOpen ? "\u25B2" : "\u25BC"}
+            </span>
+          </button>
+          {alertsOpen && (
+            <div className="border border-t-0 border-amber-200 rounded-b-lg bg-white divide-y divide-amber-100">
+              {alerts.map((alert) => (
+                <div
+                  key={alert.id}
+                  className="px-4 py-3 flex items-start gap-3 hover:bg-amber-50/50 transition-colors"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-gray-800 font-medium leading-snug">
+                      {alert.title}
+                    </p>
+                    <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
+                      <span>{alert.source}</span>
+                      {alert.authority && (
+                        <span className="px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">
+                          {alert.authority}
+                        </span>
+                      )}
+                      {alert.powerMW != null && (
+                        <span>{alert.powerMW} MW</span>
+                      )}
+                      {alert.energyMWh != null && (
+                        <span>{alert.energyMWh} MWh</span>
+                      )}
+                      {alert.publishedAt && (
+                        <span>
+                          {formatDate(alert.publishedAt)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {alert.sourceUrl && (
+                    <a
+                      href={alert.sourceUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-[#0D1F3C] hover:underline whitespace-nowrap shrink-0"
+                    >
+                      Read &rarr;
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Table */}
       <div className="px-6 py-4">

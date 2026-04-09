@@ -4,6 +4,9 @@ import {
   doc,
   updateDoc,
   Timestamp,
+  query,
+  orderBy,
+  limit,
 } from "firebase/firestore";
 import { db } from "./firebase";
 
@@ -57,6 +60,29 @@ export async function updateFlag(
     [`flags.${uid}`]: flag,
     lastUpdatedAt: Timestamp.now(),
   });
+}
+
+export interface Alert {
+  id: string;
+  title: string;
+  source: string;
+  sourceUrl: string | null;
+  publishedAt: Timestamp | null;
+  authority: string | null;
+  powerMW: number | null;
+  energyMWh: number | null;
+  category: string | null;
+  createdAt: Timestamp | null;
+}
+
+export async function getAlerts(max = 20): Promise<Alert[]> {
+  const q = query(
+    collection(db, "alerts"),
+    orderBy("createdAt", "desc"),
+    limit(max)
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as Alert);
 }
 
 export async function updateNote(
