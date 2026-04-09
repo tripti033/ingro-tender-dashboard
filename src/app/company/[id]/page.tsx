@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { getCompany, getBidsByCompany, getContactsByCompany, type Company, type Bid, type Contact } from "@/lib/firestore";
+import { getCompany, getBidsByCompany, getContactsByCompany, getTenders, type Company, type Bid, type Contact, type Tender } from "@/lib/firestore";
 import AuthGuard from "@/components/AuthGuard";
 import Navbar from "@/components/Navbar";
 
@@ -32,6 +32,7 @@ function CompanyProfileContent() {
   const [company, setCompany] = useState<Company | null>(null);
   const [bids, setBids] = useState<Bid[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [issuedTenders, setIssuedTenders] = useState<Tender[]>([]);
   const [loading, setLoading] = useState(true);
   const [bidFilter, setBidFilter] = useState<"all" | "won" | "lost">("all");
 
@@ -40,6 +41,13 @@ function CompanyProfileContent() {
       getCompany(id).then(setCompany),
       getBidsByCompany(id).then(setBids),
       getContactsByCompany(id).then(setContacts),
+      // For Boards: find tenders where this company is the authority
+      getTenders().then((all) => {
+        const name = id.replace(/-/g, " ");
+        setIssuedTenders(all.filter((t) =>
+          t.authority && t.authority.toLowerCase().replace(/[^a-z0-9]/g, "") === name.toLowerCase().replace(/[^a-z0-9]/g, "")
+        ));
+      }),
     ]).finally(() => setLoading(false));
   }, [id]);
 
@@ -153,6 +161,48 @@ function CompanyProfileContent() {
               )}
             </Section>
           </div>
+
+          {/* Tenders issued by this authority (for Boards) */}
+          {issuedTenders.length > 0 && (
+            <div className="lg:col-span-2">
+              <Section title={`Tenders Issued (${issuedTenders.length})`}>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 text-left text-gray-500 text-xs uppercase">
+                      <tr>
+                        <th className="px-3 py-2">NIT Number</th>
+                        <th className="px-3 py-2">Category</th>
+                        <th className="px-3 py-2">Location</th>
+                        <th className="px-3 py-2 text-right">MW</th>
+                        <th className="px-3 py-2 text-right">MWh</th>
+                        <th className="px-3 py-2">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {issuedTenders.map((t) => (
+                        <tr key={t.nitNumber} onClick={() => router.push(`/tender/${encodeURIComponent(t.nitNumber)}`)}
+                          className="hover:bg-gray-50 cursor-pointer">
+                          <td className="px-3 py-2 font-mono text-xs">{t.nitNumber.slice(0, 30)}</td>
+                          <td className="px-3 py-2 text-xs">{t.category || "\u2014"}</td>
+                          <td className="px-3 py-2 text-xs">{t.location || "\u2014"}</td>
+                          <td className="px-3 py-2 text-right">{t.powerMW?.toLocaleString() || "\u2014"}</td>
+                          <td className="px-3 py-2 text-right">{t.energyMWh?.toLocaleString() || "\u2014"}</td>
+                          <td className="px-3 py-2">
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                              t.tenderStatus === "active" ? "bg-green-100 text-green-800" :
+                              t.tenderStatus === "closing_soon" ? "bg-amber-100 text-amber-800" :
+                              t.tenderStatus === "closed" ? "bg-red-100 text-red-700" :
+                              "bg-gray-100 text-gray-700"
+                            }`}>{t.tenderStatus}</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Section>
+            </div>
+          )}
 
           {/* Contacts — right column */}
           <div className="space-y-6">

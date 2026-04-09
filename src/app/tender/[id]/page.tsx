@@ -6,7 +6,7 @@ import { type User } from "firebase/auth";
 import { doc, getDoc, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { onAuthChange } from "@/lib/auth";
-import { updateFlag, updateNote, updateTender, getEditHistory, type Tender, type EditHistoryEntry } from "@/lib/firestore";
+import { updateFlag, updateNote, updateTender, getEditHistory, getBidsByTender, type Tender, type EditHistoryEntry, type Bid } from "@/lib/firestore";
 import AuthGuard from "@/components/AuthGuard";
 import Navbar from "@/components/Navbar";
 
@@ -17,6 +17,20 @@ const FLAG_OPTIONS = [
   { label: "Don\u2019t Qualify", color: "border-red-400 bg-red-50 text-red-700" },
   { label: "Expired", color: "border-gray-400 bg-gray-50 text-gray-500" },
 ];
+
+const STATUS_PIPELINE = [
+  { value: "tender_open", label: "Tender Open", color: "bg-blue-500" },
+  { value: "bidding_open", label: "Bidding Open", color: "bg-amber-500" },
+  { value: "active", label: "Active", color: "bg-green-500" },
+  { value: "closing_soon", label: "Closing Soon", color: "bg-orange-500" },
+  { value: "assigned", label: "Assigned", color: "bg-indigo-500" },
+  { value: "signed_ppa", label: "Signed PPA", color: "bg-emerald-500" },
+  { value: "closed", label: "Closed", color: "bg-gray-400" },
+  { value: "cancelled", label: "Cancelled", color: "bg-red-500" },
+  { value: "awarded", label: "Awarded", color: "bg-teal-500" },
+];
+
+const INGRO_TEAM = ["Aman", "Ankit", "Tripti", "Khushi", "Virendra"];
 
 const CATEGORY_OPTIONS = ["Standalone", "FDRE", "S+S", "PSP", "Hybrid", "Pump Storage Plant"];
 const MODE_OPTIONS = ["EPC", "BOOT", "BOO", "BOT", "DBOO", "DBFOO", "BOQ"];
@@ -155,6 +169,7 @@ function TenderDetailContent() {
 
   // Edit history
   const [editHistory, setEditHistory] = useState<EditHistoryEntry[]>([]);
+  const [tenderBids, setTenderBids] = useState<Bid[]>([]);
 
   // Flag & note
   const [selectedFlag, setSelectedFlag] = useState("");
@@ -165,10 +180,11 @@ function TenderDetailContent() {
 
   useEffect(() => { return onAuthChange(setUser); }, []);
 
-  // Load edit history
+  // Load edit history and bids
   useEffect(() => {
     if (id) {
       getEditHistory(id).then(setEditHistory).catch(() => {});
+      getBidsByTender(id).then(setTenderBids).catch(() => {});
     }
   }, [id]);
 
@@ -205,6 +221,7 @@ function TenderDetailContent() {
       connectivityType: t.connectivityType || "",
       biddingStructure: t.biddingStructure || "",
       bespaSigning: t.bespaSigning || "",
+      assignedTo: t.assignedTo || "",
       preBidDate: tsToInputValue(t.preBidDate),
       preBidLink: t.preBidLink || "",
       bidDeadline: tsToInputValue(t.bidDeadline),
@@ -297,6 +314,7 @@ function TenderDetailContent() {
       portalRegistrationFee: parseNum(form.portalRegistrationFee),
       totalCost: parseNum(form.totalCost),
       sourceUrl: form.sourceUrl || null,
+      assignedTo: form.assignedTo || null,
       daysLeft,
       tenderStatus,
     };
@@ -374,6 +392,32 @@ function TenderDetailContent() {
             {copied && <span className="text-xs text-green-600">Copied!</span>}
             <StatusBadge status={t.tenderStatus} />
             {t.daysLeft != null && t.daysLeft >= 0 && <span className="text-sm text-gray-500">{t.daysLeft} days left</span>}
+            {t.assignedTo && <span className="text-sm bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">{t.assignedTo}</span>}
+            {t.authority && (
+              <button onClick={() => router.push(`/company/${encodeURIComponent(t.authority!.toLowerCase().replace(/[^a-z0-9]+/g, "-"))}`)}
+                className="text-sm text-[#0D1F3C] hover:underline">{t.authority} &rarr;</button>
+            )}
+          </div>
+
+          {/* Status Pipeline */}
+          <div className="flex items-center gap-1 mt-4 overflow-x-auto pb-1">
+            {STATUS_PIPELINE.map((s, i) => {
+              const isActive = t.tenderStatus === s.value;
+              return (
+                <button key={s.value}
+                  onClick={async () => {
+                    if (!user) return;
+                    await updateTender(t.nitNumber, { tenderStatus: s.value } as Partial<Tender>, t, user.email || "", user.uid);
+                    setTender({ ...t, tenderStatus: s.value });
+                  }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all whitespace-nowrap ${
+                    isActive ? `${s.color} text-white shadow-sm` : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                  }`}>
+                  {isActive && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
+                  {s.label}
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -393,10 +437,14 @@ function TenderDetailContent() {
                   <EditSelect label="Connectivity" value={f("connectivityType")} onChange={sf("connectivityType")} options={CONNECTIVITY_OPTIONS} />
                   <EditText label="Bidding Structure" value={f("biddingStructure")} onChange={sf("biddingStructure")} />
                   <EditText label="BESPA Signing" value={f("bespaSigning")} onChange={sf("bespaSigning")} />
+                  <EditSelect label="Assigned To" value={f("assignedTo")} onChange={sf("assignedTo")} options={INGRO_TEAM} />
                 </>
               ) : (
                 <>
-                  <Row label="Authority" value={t.authority} />
+                  <Row label="Authority" value={t.authority ? (
+                    <button onClick={() => router.push(`/company/${encodeURIComponent(t.authority!.toLowerCase().replace(/[^a-z0-9]+/g, "-"))}`)}
+                      className="text-[#0D1F3C] hover:underline">{t.authority}</button>
+                  ) : null} />
                   <Row label="Category" value={t.category} />
                   <Row label="Tender Mode" value={t.tenderMode} />
                   <Row label="Location" value={t.location} />
@@ -406,6 +454,9 @@ function TenderDetailContent() {
                   <Row label="Connectivity" value={t.connectivityType} />
                   <Row label="Bidding Structure" value={t.biddingStructure} />
                   <Row label="BESPA Signing" value={t.bespaSigning} />
+                  <Row label="Assigned To" value={t.assignedTo ? (
+                    <span className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full text-xs font-medium">{t.assignedTo}</span>
+                  ) : null} />
                 </>
               )}
             </Section>
@@ -505,6 +556,30 @@ function TenderDetailContent() {
 
           {/* Column 3 — Team Actions */}
           <div className="space-y-6">
+            {/* Bids on this tender */}
+            {tenderBids.length > 0 && (
+              <Section title={`Bids (${tenderBids.length})`}>
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {tenderBids.map((b) => (
+                    <div key={b.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
+                      <div>
+                        <button onClick={() => router.push(`/company/${encodeURIComponent(b.companyId)}`)}
+                          className="text-sm font-medium text-[#0D1F3C] hover:underline">{b.companyName}</button>
+                        <div className="text-xs text-gray-400">
+                          {b.capacityMWh ? `${b.capacityMWh} MWh` : ""}
+                          {b.priceStandalone ? ` \u00B7 ${b.priceStandalone} L/MW` : ""}
+                          {b.priceFDRE ? ` \u00B7 ${b.priceFDRE} Rs/KWh` : ""}
+                        </div>
+                      </div>
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                        b.result === "won" ? "bg-green-100 text-green-800" : b.result === "lost" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-800"
+                      }`}>{b.result}</span>
+                    </div>
+                  ))}
+                </div>
+              </Section>
+            )}
+
             <Section title="Your Flag">
               <div className="space-y-2">
                 {FLAG_OPTIONS.map((opt) => (

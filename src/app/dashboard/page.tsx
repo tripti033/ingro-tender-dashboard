@@ -265,6 +265,7 @@ function DashboardContent() {
                   <th className="px-3 py-3">Days Left</th>
                   <th className="px-3 py-3 text-right">EMD</th>
                   <th className="px-3 py-3 text-right">Total Cost</th>
+                  <th className="px-3 py-3">Assigned</th>
                   <th className="px-3 py-3">Flag</th>
                   <th className="px-3 py-3">Docs</th>
                 </tr>
@@ -304,6 +305,9 @@ function DashboardContent() {
                     <td className="px-3 py-2.5">{daysLeftDisplay(t.daysLeft)}</td>
                     <td className="px-3 py-2.5 text-right text-xs">{formatINR(t.emdAmount)}</td>
                     <td className="px-3 py-2.5 text-right text-xs font-medium">{formatINR(t.totalCost)}</td>
+                    <td className="px-3 py-2.5 text-xs">
+                      {t.assignedTo ? <span className="bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-full text-xs">{t.assignedTo}</span> : "\u2014"}
+                    </td>
                     <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
                       <select
                         value={getUserFlag(t)}
