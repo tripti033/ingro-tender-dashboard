@@ -45,9 +45,27 @@ export interface Tender {
   lastUpdatedAt: Timestamp | null;
 }
 
+// Patterns that indicate junk/nav data, not real tenders
+const JUNK_TITLE_PATTERNS = [
+  /^screen reader/i,
+  /^search\s*\|/i,
+  /^\d{2}-\w{3}-\d{4}\s*search/i,
+  /^mis reports/i,
+  /^visitor no/i,
+  /^active tenders$/i,
+  /^tenders by/i,
+  /^contents owned/i,
+];
+
 export async function getTenders(): Promise<Tender[]> {
   const snapshot = await getDocs(collection(db, "tenders"));
-  return snapshot.docs.map((d) => ({ nitNumber: d.id, ...d.data() }) as Tender);
+  return snapshot.docs
+    .map((d) => ({ nitNumber: d.id, ...d.data() }) as Tender)
+    .filter((t) => {
+      const title = t.title || "";
+      if (title.length < 10) return false;
+      return !JUNK_TITLE_PATTERNS.some((p) => p.test(title));
+    });
 }
 
 export async function updateFlag(

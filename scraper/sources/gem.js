@@ -1,20 +1,20 @@
 import { chromium } from "playwright";
 
 const GEM_BIDS_URL = "https://bidplus.gem.gov.in/all-bids";
+const GEM_API_URL = "https://bidplus.gem.gov.in/all-bids-data";
 
 const SEARCH_TERMS = [
   "battery energy storage",
   "BESS",
   "energy storage system",
-  "battery storage",
 ];
 
 const USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36";
 
 /**
- * Scrape GeM (Government e-Marketplace) bidplus portal for BESS-related bids.
- * Uses the searchBid field on the all-bids page which triggers AJAX search.
+ * Scrape GeM (Government e-Marketplace) for BESS-related bids.
+ * Intercepts the JSON API response from /all-bids-data for clean structured data.
  */
 export async function scrapeGem() {
   const browser = await chromium.launch({ headless: true });
@@ -22,147 +22,118 @@ export async function scrapeGem() {
   const page = await context.newPage();
   page.setDefaultTimeout(60000);
 
-  const allTenders = new Map(); // dedup within source by bid number
+  const allTenders = new Map();
 
   try {
     for (const term of SEARCH_TERMS) {
       try {
+        // Collect API responses
+        const apiData = [];
+        page.on("response", async (response) => {
+          if (response.url().includes("all-bids-data")) {
+            try {
+              const json = await response.json();
+              apiData.push(json);
+            } catch {
+              // Not JSON
+            }
+          }
+        });
+
         await page.goto(GEM_BIDS_URL, { waitUntil: "networkidle" });
         await page.waitForTimeout(3000);
 
-        // Find the searchBid input
+        // Search using the searchBid input
         const searchInput = await page.$("#searchBid");
         if (!searchInput) {
-          console.log("[GeM] searchBid field not found, trying alternatives");
-          // Try other possible selectors
-          const altInput = await page.$(
-            'input[type="search"], input[placeholder*="Keyword"]'
-          );
-          if (!altInput) {
-            console.log("[GeM] No search field found, skipping");
-            break;
-          }
-          await altInput.fill(term);
-        } else {
-          await searchInput.fill(term);
+          console.log("[GeM] searchBid field not found");
+          break;
         }
 
+        await searchInput.fill(term);
         await page.waitForTimeout(500);
 
-        // Click the search button
         const searchBtn = await page.$("#searchBidRA");
         if (searchBtn) {
           await searchBtn.click();
         } else {
-          // Try pressing Enter or finding any search button
-          const btn = await page.$(
-            'button[type="submit"], input[type="submit"], .search-btn'
-          );
-          if (btn) await btn.click();
-          else await (searchInput || page).press?.("Enter");
+          await searchInput.press("Enter");
         }
 
-        // Wait for AJAX results to load
+        // Wait for the API response
         await page.waitForTimeout(5000);
 
-        // Extract bid data from the page
-        const bids = await page.evaluate(() => {
-          const results = [];
+        // Parse intercepted API data
+        for (const json of apiData) {
+          const docs =
+            json?.response?.response?.docs ||
+            json?.response?.docs ||
+            [];
 
-          // GeM renders bids as cards/divs or table rows
-          // Try multiple selectors
-          const cards = document.querySelectorAll(
-            ".bid-item, .bid-card, .card, [class*='bid'], table tbody tr"
-          );
+          for (const bid of docs) {
+            const bidNumber = Array.isArray(bid.b_bid_number)
+              ? bid.b_bid_number[0]
+              : bid.b_bid_number || null;
 
-          for (const card of cards) {
-            const text = card.textContent?.trim() || "";
-            if (text.length < 20) continue;
+            if (!bidNumber) continue;
 
-            // Extract bid number (GEM/YYYY/B/NNNNN format)
-            const bidNoMatch = text.match(/GEM\/\d{4}\/[A-Z]+\/\d+/);
-            const bidNo = bidNoMatch ? bidNoMatch[0] : null;
+            // Build title from category/item names
+            const categoryName = Array.isArray(bid.b_category_name)
+              ? bid.b_category_name.join(", ")
+              : bid.b_category_name || "";
 
-            // Extract title — usually the most prominent text
-            const titleEl = card.querySelector(
-              "h4, h5, .bid-title, .title, a"
-            );
-            const title = titleEl?.textContent?.trim() || text.slice(0, 200);
+            // Get department/ministry info
+            const ministry = Array.isArray(bid.ba_official_details_minName)
+              ? bid.ba_official_details_minName[0]
+              : bid.ba_official_details_minName || "";
+            const department = Array.isArray(bid.ba_official_details_deptName)
+              ? bid.ba_official_details_deptName[0]
+              : bid.ba_official_details_deptName || "";
 
-            // Extract dates
-            const dateMatch = text.match(
-              /(?:closing|end|last)\s*(?:date|time)?\s*[:.]?\s*(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})/i
-            );
-            const closingDate = dateMatch ? dateMatch[1] : null;
+            const title = categoryName || `${ministry} - ${department}`;
 
-            // Extract value/amount
-            const valueMatch = text.match(
-              /(?:estimated|total|bid)\s*(?:value|amount)?\s*[:.]?\s*(?:Rs\.?\s*|INR\s*)?(\d[\d,.]*)\s*(Cr|Lakh|Lac)?/i
-            );
+            // Skip if title is too short or clearly not useful
+            if (!title || title.length < 5) continue;
 
-            // Extract link
-            const link = card.querySelector("a[href]")?.href || null;
+            // Parse dates
+            const endDate = Array.isArray(bid.final_end_date_sort)
+              ? bid.final_end_date_sort[0]
+              : bid.final_end_date_sort || null;
 
-            if (bidNo || title.length > 30) {
-              results.push({
-                bidNo,
-                title,
-                closingDate,
-                value: valueMatch ? valueMatch[1] : null,
-                valueUnit: valueMatch ? valueMatch[2] : null,
-                link,
+            // Build document link
+            const internalId = Array.isArray(bid.b_id)
+              ? bid.b_id[0]
+              : bid.b_id || bid.id;
+            const docLink = internalId
+              ? `https://bidplus.gem.gov.in/showbidDocument/${internalId}`
+              : null;
+
+            // Quantity
+            const quantity = Array.isArray(bid.b_total_quantity)
+              ? bid.b_total_quantity[0]
+              : bid.b_total_quantity || null;
+
+            if (!allTenders.has(bidNumber)) {
+              allTenders.set(bidNumber, {
+                nitNumber: bidNumber,
+                title: `${title}${quantity ? ` (Qty: ${quantity})` : ""}`,
+                authority: "GeM",
+                bidDeadline: endDate,
+                documentLink: docLink,
+                sourceUrl: GEM_BIDS_URL,
+                source: "GeM",
+                description: `${ministry} | ${department}`,
               });
             }
           }
-
-          // Also try extracting from any rendered list structure
-          document
-            .querySelectorAll(
-              ".block, .bid-listing, [id*='bid'], .listing-item"
-            )
-            .forEach((el) => {
-              const text = el.textContent?.trim() || "";
-              const bidNoMatch = text.match(/GEM\/\d{4}\/[A-Z]+\/\d+/);
-              const titleEl = el.querySelector("a, h4, h5, .title");
-              const link = el.querySelector("a[href]")?.href || null;
-
-              if (bidNoMatch || (text.length > 50 && titleEl)) {
-                results.push({
-                  bidNo: bidNoMatch ? bidNoMatch[0] : null,
-                  title: titleEl?.textContent?.trim() || text.slice(0, 200),
-                  closingDate: null,
-                  value: null,
-                  valueUnit: null,
-                  link,
-                });
-              }
-            });
-
-          return results;
-        });
-
-        for (const bid of bids) {
-          const key = bid.bidNo || bid.title.slice(0, 60);
-          if (!allTenders.has(key)) {
-            allTenders.set(key, {
-              nitNumber: bid.bidNo,
-              title: bid.title,
-              authority: "GeM",
-              bidDeadline: bid.closingDate,
-              emdAmount: bid.value
-                ? parseFloat(bid.value.replace(/,/g, ""))
-                : null,
-              emdUnit: bid.valueUnit || null,
-              documentLink: bid.link,
-              sourceUrl: GEM_BIDS_URL,
-              source: "GeM",
-            });
-          }
         }
 
+        // Clear listener for next search term
+        page.removeAllListeners("response");
         await page.waitForTimeout(2000);
       } catch (err) {
         console.log(`[GeM] Search "${term}" failed: ${err.message}`);
+        page.removeAllListeners("response");
       }
     }
 

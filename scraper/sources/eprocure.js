@@ -2,25 +2,39 @@ import { chromium } from "playwright";
 
 const EPROCURE_URL = "https://eprocure.gov.in/eprocure/app";
 
-// Multiple search terms to maximize coverage — the homepage search
-// matches against tender titles, so we try several variations
+// Multiple search terms to maximize coverage
 const SEARCH_TERMS = [
   "battery energy storage",
   "BESS",
   "energy storage system",
   "battery storage",
-  "grid scale battery",
-  "standalone storage",
-  "energy storage",
 ];
 
 const USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36";
 
+// Minimum title length to filter out nav/junk rows
+const MIN_TITLE_LENGTH = 30;
+
+// Words that indicate a row is navigation, not a tender
+const JUNK_PATTERNS = [
+  /^screen reader/i,
+  /^search$/i,
+  /^active tenders$/i,
+  /^tenders by/i,
+  /^corrigendum$/i,
+  /^mis reports/i,
+  /^bid awards/i,
+  /^home$/i,
+  /^help$/i,
+  /^contact/i,
+  /^sitemap/i,
+  /^login/i,
+];
+
 /**
  * Scrape eProcure (Central Public Procurement Portal) for BESS tenders.
  * Uses the homepage SearchDescription field which does NOT require CAPTCHA.
- * Searches multiple keyword variations to catch different title wordings.
  */
 export async function scrapeEprocure() {
   const browser = await chromium.launch({ headless: true });
@@ -28,7 +42,7 @@ export async function scrapeEprocure() {
   const page = await context.newPage();
   page.setDefaultTimeout(60000);
 
-  const allTenders = new Map(); // dedup by tender ID within this source
+  const allTenders = new Map();
 
   try {
     for (const term of SEARCH_TERMS) {
@@ -36,17 +50,12 @@ export async function scrapeEprocure() {
         await page.goto(EPROCURE_URL, { waitUntil: "networkidle" });
         await page.waitForTimeout(2000);
 
-        // Fill the search field and submit
         const searchInput = await page.$("#SearchDescription");
-        if (!searchInput) {
-          console.log("[eProcure] Search field not found, skipping");
-          break;
-        }
+        if (!searchInput) break;
 
         await searchInput.fill(term);
         await page.waitForTimeout(500);
 
-        // Click the Go/Search button
         const submitBtn = await page.$("#Go");
         if (submitBtn) {
           await submitBtn.click();
@@ -56,36 +65,41 @@ export async function scrapeEprocure() {
 
         await page.waitForTimeout(3000);
 
-        // Extract results from the tender table
+        // Extract rows — look specifically for the Tender List table
+        // which has columns: S.No | e-Published Date | Closing Date | Opening Date | Title and Ref.No./Tender ID | Organisation Chain
         const rows = await page.evaluate(() => {
           const results = [];
           const tables = document.querySelectorAll("table");
 
           for (const table of tables) {
-            const headerText = table.textContent || "";
-            // Look for the results table that has tender columns
-            if (
-              !headerText.includes("e-Published Date") &&
-              !headerText.includes("Tender ID")
-            )
-              continue;
-
             const trs = table.querySelectorAll("tr");
+            let isResultTable = false;
+
             for (const tr of trs) {
               const cells = tr.querySelectorAll("td");
-              if (cells.length < 4) continue;
+              const ths = tr.querySelectorAll("th, td.list_header");
+
+              // Detect if this is the header row of the results table
+              const headerText = Array.from(ths.length > 0 ? ths : cells)
+                .map((c) => c.textContent?.trim() || "")
+                .join(" ");
+              if (
+                headerText.includes("e-Published Date") &&
+                headerText.includes("Closing Date")
+              ) {
+                isResultTable = true;
+                continue;
+              }
+
+              if (!isResultTable || cells.length < 5) continue;
 
               const cellTexts = Array.from(cells).map(
-                (c) => c.textContent?.trim() || ""
+                (c) => c.textContent?.trim().replace(/\s+/g, " ") || ""
               );
 
-              // Skip header-like rows
-              if (
-                cellTexts[0] === "S.No" ||
-                cellTexts[0] === "" ||
-                cellTexts.join("").includes("No Tenders found")
-              )
-                continue;
+              // S.No should be a number
+              const sno = cellTexts[0];
+              if (!/^\d+$/.test(sno)) continue;
 
               const links = tr.querySelectorAll("a[href]");
               const docLink =
@@ -104,48 +118,40 @@ export async function scrapeEprocure() {
           return results;
         });
 
-        // Parse each row into a tender object
-        // Table columns: S.No | e-Published Date | Closing Date | Opening Date | Title and Ref.No./Tender ID | Organisation Chain
         for (const row of rows) {
           const cells = row.cells;
-          if (cells.length < 5) continue;
 
-          // Title + Ref column is usually index 4 (or the longest cell)
-          const titleRefCell =
-            cells.find((c) => c.length > 40) || cells[4] || "";
+          // Column layout: [0]=S.No [1]=e-Published Date [2]=Closing Date [3]=Opening Date [4]=Title+Ref [5]=Org Chain
+          const titleRefCell = cells[4] || "";
+          const orgChain = cells[5] || "";
+          const closingDate = cells[2] || null;
 
-          // Extract tender ID/NIT — often in parentheses or after title
+          // Skip junk
+          if (titleRefCell.length < MIN_TITLE_LENGTH) continue;
+          if (JUNK_PATTERNS.some((p) => p.test(titleRefCell))) continue;
+          if (titleRefCell.includes("No Tenders found")) continue;
+
+          // Extract tender ID from the title+ref cell
           const nitMatch = titleRefCell.match(
-            /(?:Tender\s*ID|Ref\.?\s*No\.?)\s*[:.]?\s*([\w/\-. ]+)/i
+            /(?:Tender\s*ID|Ref\.?\s*No\.?|NIT)\s*[:.]?\s*([\w/\-. ]+\d[\w/\-. ]*)/i
           );
           const nitNumber = nitMatch ? nitMatch[1].trim() : null;
 
-          // Clean title
-          const title = titleRefCell
-            .replace(/Tender\s*ID\s*[:.]?\s*[\w/\-. ]+/i, "")
-            .replace(/Ref\.?\s*No\.?\s*[:.]?\s*[\w/\-. ]+/i, "")
-            .trim()
-            .slice(0, 300);
+          // Clean title — remove the ref/ID portion
+          let title = titleRefCell;
+          if (nitMatch) {
+            title = titleRefCell.replace(nitMatch[0], "").trim();
+          }
+          // Remove leading/trailing junk characters
+          title = title.replace(/^[\s|,.-]+|[\s|,.-]+$/g, "").trim();
 
-          // Parse dates — cells[1] = published, cells[2] = closing, cells[3] = opening
-          const closingDate = cells[2] || null;
-
-          // Organisation chain — last cell
-          const orgChain = cells[cells.length - 1] || "";
+          if (!title || title.length < 15) continue;
 
           // Detect authority from org chain
           let authority = "eProcure";
           const knownAuthorities = [
-            "SECI",
-            "NTPC",
-            "GUVNL",
-            "MSEDCL",
-            "SJVNL",
-            "NHPC",
-            "PGCIL",
-            "POWERGRID",
-            "MNRE",
-            "CEA",
+            "SECI", "NTPC", "GUVNL", "MSEDCL", "SJVNL",
+            "NHPC", "PGCIL", "POWERGRID", "MNRE", "CEA",
           ];
           for (const auth of knownAuthorities) {
             if (orgChain.toUpperCase().includes(auth)) {
@@ -154,11 +160,11 @@ export async function scrapeEprocure() {
             }
           }
 
-          const key = nitNumber || title.slice(0, 50);
+          const key = nitNumber || title.slice(0, 60);
           if (!allTenders.has(key)) {
             allTenders.set(key, {
               nitNumber,
-              title: title || titleRefCell,
+              title,
               authority,
               bidDeadline: closingDate,
               documentLink: row.docLink,
@@ -168,7 +174,6 @@ export async function scrapeEprocure() {
           }
         }
 
-        // Rate limit between searches
         await page.waitForTimeout(2000);
       } catch (err) {
         console.log(`[eProcure] Search "${term}" failed: ${err.message}`);
