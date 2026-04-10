@@ -1,16 +1,17 @@
 import { chromium } from "playwright";
-
-const SECI_URL = "https://www.seci.co.in/view/publish/tender?tender=all";
-
 import { BESS_KEYWORDS } from "../keywords.js";
+
+// SECI's new website URLs (redesigned — old /view/publish/tender no longer works)
+const SECI_TENDERS_URL = "https://www.seci.co.in/tenders";
+const SECI_RESULTS_URL = "https://www.seci.co.in/tenders/results";
 
 const USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36";
 
 /**
- * Scrape SECI (Solar Energy Corporation of India) tender portal.
- * SECI is a JS SPA — we intercept API/XHR responses and also
- * try multiple wait strategies to capture rendered content.
+ * Scrape SECI tender portal — both active tenders and results pages.
+ * The new SECI site uses DataTables with all rows loaded client-side.
+ * Table columns: S No | Tender ID | TSC on ETS Portal | Tender Ref No | Tender Title | Publication Date | Bid Submission Date | Tender Details
  */
 export async function scrapeSeci() {
   const browser = await chromium.launch({ headless: true });
@@ -18,192 +19,109 @@ export async function scrapeSeci() {
   const page = await context.newPage();
   page.setDefaultTimeout(60000);
 
-  // Collect API responses that may contain tender data
-  const apiResponses = [];
-  page.on("response", async (response) => {
-    const url = response.url();
-    if (
-      response.request().resourceType() === "xhr" ||
-      response.request().resourceType() === "fetch" ||
-      url.includes("tender") ||
-      url.includes("api")
-    ) {
-      try {
-        const contentType = response.headers()["content-type"] || "";
-        if (contentType.includes("json")) {
-          const json = await response.json();
-          apiResponses.push({ url, data: json });
-        }
-      } catch {
-        // Not JSON or already consumed — skip
-      }
-    }
-  });
+  const allTenders = new Map();
 
   try {
-    await page.goto(SECI_URL, {
-      waitUntil: "networkidle",
-      timeout: 60000,
+    // Scrape active tenders
+    await scrapePage(page, SECI_TENDERS_URL, allTenders);
+    await page.waitForTimeout(2000);
+
+    // Scrape results (awarded tenders)
+    await scrapePage(page, SECI_RESULTS_URL, allTenders);
+
+    const tenders = Array.from(allTenders.values());
+
+    // Filter by BESS keywords
+    const filtered = tenders.filter((t) => {
+      const text = `${t.title} ${t.nitNumber}`.toLowerCase();
+      return BESS_KEYWORDS.some((kw) => text.includes(kw));
     });
-
-    // Wait for any of these selectors that might hold tender data
-    await page
-      .waitForSelector(
-        "table tbody tr, .tender-list, .card, [class*='tender'], [class*='list']",
-        { timeout: 20000 }
-      )
-      .catch(() => {});
-
-    // Extra wait for late-rendering SPAs
-    await page.waitForTimeout(5000);
-
-    // Strategy 1: Extract from rendered DOM (tables, lists, cards)
-    const domTenders = await page.evaluate(() => {
-      const results = [];
-
-      // Tables
-      document.querySelectorAll("table").forEach((table) => {
-        table.querySelectorAll("tbody tr, tr").forEach((tr) => {
-          const cells = tr.querySelectorAll("td");
-          if (cells.length < 2) return;
-          const cellTexts = Array.from(cells).map(
-            (c) => c.textContent?.trim() || ""
-          );
-          const link =
-            Array.from(tr.querySelectorAll("a[href]"))
-              .map((a) => a.href)
-              .find(
-                (h) =>
-                  h.includes(".pdf") ||
-                  h.includes("download") ||
-                  h.includes("document") ||
-                  h.includes("tender")
-              ) || null;
-          results.push({ cells: cellTexts, docLink: link });
-        });
-      });
-
-      // Cards / divs that might hold tender info
-      document
-        .querySelectorAll(
-          ".card, [class*='tender'], [class*='list-item'], article"
-        )
-        .forEach((el) => {
-          const text = el.textContent?.trim() || "";
-          if (text.length > 20) {
-            const link = el.querySelector("a[href]")?.href || null;
-            results.push({ cells: [text], docLink: link });
-          }
-        });
-
-      return results;
-    });
-
-    // Strategy 2: Parse tenders from intercepted API responses
-    const apiTenders = [];
-    for (const resp of apiResponses) {
-      const items = extractTendersFromJson(resp.data);
-      apiTenders.push(...items);
-    }
-
-    // Combine both strategies
-    const allRows = [...domTenders, ...apiTenders];
-    const tenders = [];
-
-    for (const row of allRows) {
-      const fullText = (row.cells || []).join(" ").toLowerCase();
-
-      const isBESS = BESS_KEYWORDS.some((kw) => fullText.includes(kw));
-      if (!isBESS) continue;
-
-      // Extract NIT number
-      const cellText = (row.cells || []).join(" ");
-      const nitMatch = cellText.match(
-        /(?:NIT|SECI|Tender)\s*(?:No\.?|#)?\s*[:.]?\s*([\w/\-. ]+\d[\w/\-. ]*)/i
-      );
-      const nitNumber = nitMatch ? nitMatch[1].trim() : null;
-
-      const title = row.title ||
-        (row.cells || []).reduce(
-          (a, b) => (a.length > b.length ? a : b),
-          ""
-        ) ||
-        "";
-
-      // Extract closing date
-      const dateMatch = cellText.match(
-        /(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})/
-      );
-
-      tenders.push({
-        nitNumber,
-        title,
-        authority: "SECI",
-        bidDeadline: row.bidDeadline || (dateMatch ? dateMatch[1] : null),
-        documentLink: row.docLink || null,
-        sourceUrl: SECI_URL,
-        source: "SECI",
-      });
-    }
 
     console.log(
-      `[SECI] Found ${tenders.length} BESS tenders (DOM: ${domTenders.length} rows, API: ${apiTenders.length} items intercepted)`
+      `[SECI] Found ${filtered.length} BESS tenders out of ${tenders.length} total`
     );
-    return tenders;
+    return filtered;
   } finally {
     await browser.close();
   }
 }
 
 /**
- * Recursively extract tender-like objects from a JSON API response.
- * Looks for arrays of objects with title/name/description fields.
+ * Scrape a single SECI page (active or results).
  */
-function extractTendersFromJson(data) {
-  const results = [];
+async function scrapePage(page, url, tenderMap) {
+  try {
+    await page.goto(url, { waitUntil: "networkidle" });
+    await page.waitForTimeout(3000);
 
-  if (Array.isArray(data)) {
-    for (const item of data) {
-      if (item && typeof item === "object" && !Array.isArray(item)) {
-        const text =
-          item.title ||
-          item.name ||
-          item.tender_title ||
-          item.tenderTitle ||
-          item.description ||
-          "";
-        if (text) {
-          results.push({
-            cells: [
-              item.nit_no || item.nitNo || item.tender_no || "",
-              text,
-              item.closing_date || item.closingDate || item.deadline || "",
-            ],
-            title: text,
-            bidDeadline:
-              item.closing_date ||
-              item.closingDate ||
-              item.deadline ||
-              item.bid_deadline ||
-              null,
-            docLink:
-              item.document_link ||
-              item.documentLink ||
-              item.pdf_link ||
-              item.link ||
-              null,
-          });
+    // DataTables loads all rows in the DOM — extract them all
+    const rows = await page.evaluate(() => {
+      const results = [];
+      const tables = document.querySelectorAll("table");
+
+      for (const table of tables) {
+        const trs = table.querySelectorAll("tbody tr");
+        for (const tr of trs) {
+          const cells = tr.querySelectorAll("td");
+          if (cells.length < 6) continue;
+
+          const cellTexts = Array.from(cells).map(
+            (c) => c.textContent?.trim().replace(/\s+/g, " ") || ""
+          );
+
+          // Get "View Details" link
+          const detailLink = tr.querySelector('a[href*="tender-details"]');
+          const detailUrl = detailLink ? detailLink.href : null;
+
+          results.push({ cells: cellTexts, detailUrl });
         }
       }
-    }
-  } else if (data && typeof data === "object") {
-    // Check nested keys that commonly hold arrays
-    for (const key of Object.keys(data)) {
-      if (Array.isArray(data[key])) {
-        results.push(...extractTendersFromJson(data[key]));
+      return results;
+    });
+
+    for (const row of rows) {
+      const cells = row.cells;
+      // Column layout: [0]=S.No [1]=Tender ID [2]=TSC on ETS [3]=Tender Ref No [4]=Tender Title [5]=Publication Date [6]=Bid Submission Date [7]=View Details
+      // Archive has an extra column: [3]=Tender ID on CPPP, shifting others by 1
+
+      const sno = cells[0];
+      if (!/^\d+$/.test(sno)) continue; // Skip non-data rows
+
+      // Detect if this is the archive layout (extra CPPP column)
+      const hasExtraCol = cells.length >= 9;
+      const offset = hasExtraCol ? 1 : 0;
+
+      const tenderId = cells[1] || "";
+      const tscEts = cells[2] || "";
+      const tenderRef = cells[3 + offset] || "";
+      const title = cells[4 + offset] || "";
+      const pubDate = cells[5 + offset] || "";
+      const bidDeadline = cells[6 + offset] || "";
+
+      // Use TSC ETS portal ID or Tender Ref as NIT number
+      const nitNumber = tscEts || tenderRef || tenderId;
+      if (!nitNumber || nitNumber.length < 3) continue;
+      if (!title || title.length < 5) continue;
+
+      const key = nitNumber;
+      if (!tenderMap.has(key)) {
+        tenderMap.set(key, {
+          nitNumber,
+          title,
+          authority: "SECI",
+          bidDeadline: bidDeadline || null,
+          documentLink: row.detailUrl || null,
+          sourceUrl: url,
+          source: "SECI",
+          tenderRef,
+          tenderId,
+          pubDate,
+        });
       }
     }
-  }
 
-  return results;
+    console.log(`[SECI] Scraped ${url.split("/").pop()}: ${rows.length} rows`);
+  } catch (err) {
+    console.log(`[SECI] Failed to scrape ${url}: ${err.message}`);
+  }
 }
