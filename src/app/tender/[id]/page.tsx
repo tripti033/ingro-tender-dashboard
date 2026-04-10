@@ -487,9 +487,31 @@ function TenderDetailContent() {
             </Section>
 
             {!editing && (
-              <Section title="Links">
+              <Section title="Documents & Links">
+                {/* All documents */}
+                {t.documents && t.documents.length > 0 ? (
+                  <div className="space-y-2 mb-4">
+                    {t.documents.map((d, i) => (
+                      <div key={i} className="flex items-center justify-between py-1.5 border-b border-gray-100 last:border-0">
+                        <a href={d.url} target="_blank" rel="noopener noreferrer"
+                          className="text-sm text-[#0D1F3C] hover:underline flex items-center gap-1.5 min-w-0">
+                          <span className="shrink-0">{d.name.endsWith(".pdf") ? "\uD83D\uDCC4" : "\uD83D\uDCCE"}</span>
+                          <span className="truncate">{d.name}</span>
+                        </a>
+                        {d.uploadDate && <span className="text-xs text-gray-400 shrink-0 ml-2">{d.uploadDate.split(" ")[0]}</span>}
+                      </div>
+                    ))}
+                  </div>
+                ) : t.documentLink ? (
+                  <div className="mb-4">
+                    <a href={t.documentLink} target="_blank" rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 bg-[#0D1F3C] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#162d52]">
+                      Bid Documents &rarr;
+                    </a>
+                  </div>
+                ) : null}
+                {/* Other links */}
                 <div className="flex flex-wrap gap-3">
-                  {t.documentLink && <a href={t.documentLink} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 bg-[#0D1F3C] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#162d52]">Bid Documents &rarr;</a>}
                   {t.preBidLink && <a href={t.preBidLink} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 border border-[#0D1F3C] text-[#0D1F3C] px-4 py-2 rounded-lg text-sm hover:bg-gray-50">Pre-bid Meeting &rarr;</a>}
                   {t.sourceUrl && <a href={t.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-[#0D1F3C] hover:underline py-2">View Source &rarr;</a>}
                 </div>

@@ -59,6 +59,7 @@ export interface Tender {
   paymentSecurityFund: number | null;
   portalRegistrationFee: number | null;
   totalCost: number | null;
+  documents: { name: string; url: string; uploadDate: string | null }[] | null;
   daysLeft: number | null;
   tenderStatus: string;
   sourceUrl: string | null;

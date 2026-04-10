@@ -169,17 +169,29 @@ async function extractDetailPage(page, tender) {
     // Key Dates — table[8]
     if (tables[8]) Object.assign(data, extractPairs(tables[8]));
 
-    // Documents — table[9] (get first PDF link)
-    const docLinks = [];
-    if (tables[9]) {
-      tables[9].querySelectorAll("a[href]").forEach((a) => {
+    // Documents — collect ALL docs from all tables (Tender Documents + Corrigendums)
+    const documents = [];
+    for (const table of tables) {
+      table.querySelectorAll("a[href]").forEach((a) => {
         const href = a.href;
         if (href.includes("/uploads/tenders/") && href.match(/\.(pdf|xlsx?)$/i)) {
-          docLinks.push(href);
+          const name = a.textContent?.trim() || href.split("/").pop() || "";
+          // Get upload date from sibling/next cell
+          const row = a.closest("tr");
+          const cells = row ? row.querySelectorAll("td") : [];
+          const dateCell = Array.from(cells).find((c) =>
+            /\d{2}\/\d{2}\/\d{4}/.test(c.textContent || "")
+          );
+          const uploadDate = dateCell ? dateCell.textContent?.trim() : null;
+
+          // Avoid duplicates
+          if (!documents.some((d) => d.url === href)) {
+            documents.push({ name, url: href, uploadDate });
+          }
         }
       });
     }
-    data._docLinks = docLinks;
+    data._documents = documents;
 
     return data;
   });
@@ -211,13 +223,15 @@ async function extractDetailPage(page, tender) {
   const bidOpen = details["Bid Open Date"] || null;
   if (bidOpen) tender.techBidOpeningDate = bidOpen.split(" ")[0];
 
-  // Documents — use first PDF as document link
-  if (details._docLinks && details._docLinks.length > 0) {
-    // Prefer RfS/RFS document over integrity pact
-    const rfsDoc = details._docLinks.find((l) =>
-      /rfs|rps|selection|tender/i.test(l) && !/(integrity|format|clarification)/i.test(l)
+  // Documents — save all as array, set primary documentLink to the RfS doc
+  const docs = details._documents || [];
+  if (docs.length > 0) {
+    tender.documents = docs;
+    // Primary doc link: prefer RfS/selection doc
+    const rfsDoc = docs.find((d) =>
+      /rfs|rps|selection/i.test(d.name) && !/(integrity|format|clarification)/i.test(d.name)
     );
-    tender.documentLink = rfsDoc || details._docLinks[0];
+    tender.documentLink = rfsDoc ? rfsDoc.url : docs[0].url;
   }
 
   console.log(`[SECI] Detail extracted: ${tender.nitNumber} — ${tender.title.slice(0, 50)}`);
