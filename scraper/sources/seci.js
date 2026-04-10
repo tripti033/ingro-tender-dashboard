@@ -184,9 +184,11 @@ async function extractDetailPage(page, tender) {
           );
           const uploadDate = dateCell ? dateCell.textContent?.trim() : null;
 
-          // Avoid duplicates
-          if (!documents.some((d) => d.url === href)) {
-            documents.push({ name, url: href, uploadDate });
+          // Avoid duplicates and generic "View Document" labels
+          if (!documents.some((d) => d.url === href) && name !== "View Document") {
+            // Use filename from URL if name is not useful
+            const displayName = name.length > 3 ? name : href.split("/").pop() || name;
+            documents.push({ name: displayName, url: href, uploadDate });
           }
         }
       });

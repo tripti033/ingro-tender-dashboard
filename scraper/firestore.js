@@ -132,7 +132,9 @@ export async function writeTenders(tenders) {
           "daysLeft",
           "tenderStatus",
           "documentLink",
+          "documents",
           "preBidLink",
+          "sourceUrl",
         ];
 
         let hasChanges = false;
@@ -141,8 +143,8 @@ export async function writeTenders(tenders) {
             updates[field] = tender[field];
             hasChanges = true;
           }
-          // Always update dynamic fields and URLs
-          if (["daysLeft", "tenderStatus", "sourceUrl", "documentLink"].includes(field)) {
+          // Always update dynamic fields, URLs, and documents
+          if (["daysLeft", "tenderStatus", "sourceUrl", "documentLink", "documents"].includes(field)) {
             if (tender[field] != null && tender[field] !== existing[field]) {
               updates[field] = tender[field];
               hasChanges = true;
