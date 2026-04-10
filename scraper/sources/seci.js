@@ -1,7 +1,6 @@
 import { chromium } from "playwright";
 import { BESS_KEYWORDS } from "../keywords.js";
 
-// SECI's new website URLs (redesigned — old /view/publish/tender no longer works)
 const SECI_TENDERS_URL = "https://www.seci.co.in/tenders";
 const SECI_RESULTS_URL = "https://www.seci.co.in/tenders/results";
 
@@ -9,9 +8,9 @@ const USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36";
 
 /**
- * Scrape SECI tender portal — both active tenders and results pages.
- * The new SECI site uses DataTables with all rows loaded client-side.
- * Table columns: S No | Tender ID | TSC on ETS Portal | Tender Ref No | Tender Title | Publication Date | Bid Submission Date | Tender Details
+ * Scrape SECI tender portal — active tenders + results.
+ * For BESS-matched tenders, navigates to detail page to extract
+ * financial instruments, key dates, and document links.
  */
 export async function scrapeSeci() {
   const browser = await chromium.launch({ headless: true });
@@ -22,72 +21,73 @@ export async function scrapeSeci() {
   const allTenders = new Map();
 
   try {
-    // Scrape active tenders
-    await scrapePage(page, SECI_TENDERS_URL, allTenders);
+    // Scrape listing pages
+    await scrapeListingPage(page, SECI_TENDERS_URL, allTenders);
     await page.waitForTimeout(2000);
-
-    // Scrape results (awarded tenders)
-    await scrapePage(page, SECI_RESULTS_URL, allTenders);
-
-    const tenders = Array.from(allTenders.values());
+    await scrapeListingPage(page, SECI_RESULTS_URL, allTenders);
 
     // Filter by BESS keywords
-    const filtered = tenders.filter((t) => {
-      const text = `${t.title} ${t.nitNumber}`.toLowerCase();
+    const tenders = Array.from(allTenders.values());
+    const bessTenders = tenders.filter((t) => {
+      const text = `${t.title} ${t.nitNumber} ${t.description || ""}`.toLowerCase();
       return BESS_KEYWORDS.some((kw) => text.includes(kw));
     });
 
+    // Navigate to detail page for each BESS tender to get rich data
+    for (const tender of bessTenders) {
+      if (tender.detailUrl) {
+        try {
+          await page.waitForTimeout(2000); // rate limit
+          await extractDetailPage(page, tender);
+        } catch (err) {
+          console.log(`[SECI] Detail page failed for ${tender.nitNumber}: ${err.message}`);
+        }
+      }
+    }
+
     console.log(
-      `[SECI] Found ${filtered.length} BESS tenders out of ${tenders.length} total`
+      `[SECI] Found ${bessTenders.length} BESS tenders out of ${tenders.length} total`
     );
-    return filtered;
+    return bessTenders;
   } finally {
     await browser.close();
   }
 }
 
 /**
- * Scrape a single SECI page (active or results).
+ * Scrape a SECI listing page (active or results).
+ * DataTables renders all rows client-side.
  */
-async function scrapePage(page, url, tenderMap) {
+async function scrapeListingPage(page, url, tenderMap) {
   try {
     await page.goto(url, { waitUntil: "networkidle" });
     await page.waitForTimeout(3000);
 
-    // DataTables loads all rows in the DOM — extract them all
     const rows = await page.evaluate(() => {
       const results = [];
-      const tables = document.querySelectorAll("table");
+      document.querySelectorAll("table tbody tr").forEach((tr) => {
+        const cells = tr.querySelectorAll("td");
+        if (cells.length < 6) return;
 
-      for (const table of tables) {
-        const trs = table.querySelectorAll("tbody tr");
-        for (const tr of trs) {
-          const cells = tr.querySelectorAll("td");
-          if (cells.length < 6) continue;
+        const cellTexts = Array.from(cells).map(
+          (c) => c.textContent?.trim().replace(/\s+/g, " ") || ""
+        );
 
-          const cellTexts = Array.from(cells).map(
-            (c) => c.textContent?.trim().replace(/\s+/g, " ") || ""
-          );
-
-          // Get "View Details" link
-          const detailLink = tr.querySelector('a[href*="tender-details"]');
-          const detailUrl = detailLink ? detailLink.href : null;
-
-          results.push({ cells: cellTexts, detailUrl });
-        }
-      }
+        const detailLink = tr.querySelector('a[href*="tender-details"]');
+        results.push({
+          cells: cellTexts,
+          detailUrl: detailLink ? detailLink.href : null,
+        });
+      });
       return results;
     });
 
     for (const row of rows) {
       const cells = row.cells;
-      // Column layout: [0]=S.No [1]=Tender ID [2]=TSC on ETS [3]=Tender Ref No [4]=Tender Title [5]=Publication Date [6]=Bid Submission Date [7]=View Details
-      // Archive has an extra column: [3]=Tender ID on CPPP, shifting others by 1
-
       const sno = cells[0];
-      if (!/^\d+$/.test(sno)) continue; // Skip non-data rows
+      if (!/^\d+$/.test(sno)) continue;
 
-      // Detect if this is the archive layout (extra CPPP column)
+      // Detect archive layout (extra CPPP column)
       const hasExtraCol = cells.length >= 9;
       const offset = hasExtraCol ? 1 : 0;
 
@@ -98,24 +98,31 @@ async function scrapePage(page, url, tenderMap) {
       const pubDate = cells[5 + offset] || "";
       const bidDeadline = cells[6 + offset] || "";
 
-      // Use TSC ETS portal ID or Tender Ref as NIT number
       const nitNumber = tscEts || tenderRef || tenderId;
       if (!nitNumber || nitNumber.length < 3) continue;
       if (!title || title.length < 5) continue;
 
-      const key = nitNumber;
-      if (!tenderMap.has(key)) {
-        tenderMap.set(key, {
+      if (!tenderMap.has(nitNumber)) {
+        tenderMap.set(nitNumber, {
           nitNumber,
           title,
           authority: "SECI",
           bidDeadline: bidDeadline || null,
-          documentLink: row.detailUrl || null,
           sourceUrl: url,
           source: "SECI",
           tenderRef,
           tenderId,
           pubDate,
+          detailUrl: row.detailUrl,
+          // These will be filled from detail page
+          documentLink: null,
+          description: null,
+          tenderMode: null,
+          emdAmount: null,
+          emdUnit: null,
+          tenderProcessingFee: null,
+          preBidDate: null,
+          biddingStructure: null,
         });
       }
     }
@@ -124,4 +131,94 @@ async function scrapePage(page, url, tenderMap) {
   } catch (err) {
     console.log(`[SECI] Failed to scrape ${url}: ${err.message}`);
   }
+}
+
+/**
+ * Navigate to a SECI tender detail page and extract rich data.
+ * Sections: Tender Basic Details (table[2]), Financial Instruments (table[5]),
+ * Key Dates (table[8]), Documents (table[9]).
+ */
+async function extractDetailPage(page, tender) {
+  await page.goto(tender.detailUrl, { waitUntil: "networkidle" });
+  await page.waitForTimeout(2000);
+
+  const details = await page.evaluate(() => {
+    const data = {};
+    const tables = document.querySelectorAll("table");
+
+    // Helper: extract label→value pairs from a table
+    function extractPairs(table) {
+      const pairs = {};
+      if (!table) return pairs;
+      table.querySelectorAll("tr").forEach((tr) => {
+        const cells = tr.querySelectorAll("td");
+        // Tables have 2 or 4 columns (label, value, label, value)
+        for (let i = 0; i < cells.length - 1; i += 2) {
+          const label = cells[i]?.textContent?.trim().replace(/\s+/g, " ") || "";
+          const value = cells[i + 1]?.textContent?.trim().replace(/\s+/g, " ") || "";
+          if (label && value) pairs[label] = value;
+        }
+      });
+      return pairs;
+    }
+
+    // Tender Basic Details — table[2]
+    if (tables[2]) Object.assign(data, extractPairs(tables[2]));
+    // Financial Instruments — table[5]
+    if (tables[5]) Object.assign(data, extractPairs(tables[5]));
+    // Key Dates — table[8]
+    if (tables[8]) Object.assign(data, extractPairs(tables[8]));
+
+    // Documents — table[9] (get first PDF link)
+    const docLinks = [];
+    if (tables[9]) {
+      tables[9].querySelectorAll("a[href]").forEach((a) => {
+        const href = a.href;
+        if (href.includes("/uploads/tenders/") && href.match(/\.(pdf|xlsx?)$/i)) {
+          docLinks.push(href);
+        }
+      });
+    }
+    data._docLinks = docLinks;
+
+    return data;
+  });
+
+  // Map extracted data to tender fields
+  tender.description = details["Tender Description"] || null;
+  tender.biddingStructure = details["Tender Type"] || null;
+
+  // Financial
+  const costOfRfs = details["Cost of RFS"] || details["Cost of RfS"] || null;
+  if (costOfRfs) {
+    const match = costOfRfs.match(/([\d,]+)/);
+    if (match) tender.tenderProcessingFee = parseFloat(match[1].replace(/,/g, ""));
+  }
+
+  const emd = details["EMD"] || null;
+  if (emd && emd !== "As per RfS document") {
+    const match = emd.match(/([\d,]+)/);
+    if (match) {
+      tender.emdAmount = parseFloat(match[1].replace(/,/g, ""));
+      tender.emdUnit = "INR";
+    }
+  }
+
+  // Key Dates
+  const preBid = details["Pre Bid Meeting Date"] || null;
+  if (preBid) tender.preBidDate = preBid.split(" ")[0]; // DD/MM/YYYY part only
+
+  const bidOpen = details["Bid Open Date"] || null;
+  if (bidOpen) tender.techBidOpeningDate = bidOpen.split(" ")[0];
+
+  // Documents — use first PDF as document link
+  if (details._docLinks && details._docLinks.length > 0) {
+    // Prefer RfS/RFS document over integrity pact
+    const rfsDoc = details._docLinks.find((l) =>
+      /rfs|rps|selection|tender/i.test(l) && !/(integrity|format|clarification)/i.test(l)
+    );
+    tender.documentLink = rfsDoc || details._docLinks[0];
+  }
+
+  console.log(`[SECI] Detail extracted: ${tender.nitNumber} — ${tender.title.slice(0, 50)}`);
 }
