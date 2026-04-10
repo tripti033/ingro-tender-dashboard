@@ -393,10 +393,6 @@ function TenderDetailContent() {
             <StatusBadge status={t.tenderStatus} />
             {t.daysLeft != null && t.daysLeft >= 0 && <span className="text-sm text-gray-500">{t.daysLeft} days left</span>}
             {t.assignedTo && <span className="text-sm bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">{t.assignedTo}</span>}
-            {t.authority && (
-              <button onClick={() => router.push(`/company/${encodeURIComponent(t.authority!.toLowerCase().replace(/[^a-z0-9]+/g, "-"))}`)}
-                className="text-sm text-[#0D1F3C] hover:underline">{t.authority} &rarr;</button>
-            )}
           </div>
 
           {/* Status Pipeline — only show for non-terminal statuses */}
@@ -443,10 +439,7 @@ function TenderDetailContent() {
                 </>
               ) : (
                 <>
-                  <Row label="Authority" value={t.authority ? (
-                    <button onClick={() => router.push(`/company/${encodeURIComponent(t.authority!.toLowerCase().replace(/[^a-z0-9]+/g, "-"))}`)}
-                      className="text-[#0D1F3C] hover:underline">{t.authority}</button>
-                  ) : null} />
+                  <Row label="Authority" value={t.authority} />
                   <Row label="Category" value={t.category} />
                   <Row label="Tender Mode" value={t.tenderMode} />
                   <Row label="Location" value={t.location} />
