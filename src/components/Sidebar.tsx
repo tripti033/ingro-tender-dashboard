@@ -30,11 +30,11 @@ export default function Sidebar() {
     <aside className="fixed top-0 left-0 h-screen w-56 bg-[#0D1F3C] text-white flex flex-col z-50">
       {/* Logo */}
       <div
-        className="px-5 py-5 cursor-pointer border-b border-white/10"
+        className="px-5 py-4 cursor-pointer border-b border-white/10"
         onClick={() => router.push("/dashboard")}
       >
-        <div className="text-lg font-bold">Ingro Energy</div>
-        <div className="text-xs text-gray-400 mt-0.5">BESS Tender Dashboard</div>
+        <img src="/logo-white.png" alt="Ingro Energy" className="h-8 mb-1" />
+        <div className="text-xs text-gray-400">BESS Tender Dashboard</div>
       </div>
 
       {/* Nav items */}

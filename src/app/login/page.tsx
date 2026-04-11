@@ -48,10 +48,8 @@ export default function LoginPage() {
     <div className="flex items-center justify-center min-h-screen bg-gray-50">
       <div className="w-full max-w-sm p-8 bg-white rounded-xl shadow-lg">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-[#0D1F3C] mb-1">
-            Ingro Energy
-          </h1>
-          <h2 className="text-xl font-semibold text-gray-800 mb-2">
+          <img src="/logo.png" alt="Ingro Energy" className="h-12 mx-auto mb-3" />
+          <h2 className="text-lg font-semibold text-gray-800 mb-2">
             BESS Tender Dashboard
           </h2>
           <p className="text-sm text-gray-500">
