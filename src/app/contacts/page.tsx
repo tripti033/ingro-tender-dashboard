@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { getContacts, type Contact } from "@/lib/firestore";
 import AuthGuard from "@/components/AuthGuard";
-import Navbar from "@/components/Navbar";
+import Sidebar from "@/components/Sidebar";
 
 function ContactsContent() {
   const router = useRouter();
@@ -27,8 +27,8 @@ function ContactsContent() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar />
-      <div className="px-6 py-4">
+      <Sidebar />
+      <div className="ml-56 px-6 py-4">
         <h1 className="text-xl font-bold text-gray-900 mb-4">Contacts Directory</h1>
 
         <div className="flex items-center gap-3 mb-4">

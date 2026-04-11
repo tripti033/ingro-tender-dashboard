@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { getCompany, getBidsByCompany, getContactsByCompany, type Company, type Bid, type Contact } from "@/lib/firestore";
 import AuthGuard from "@/components/AuthGuard";
-import Navbar from "@/components/Navbar";
+import Sidebar from "@/components/Sidebar";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -48,16 +48,16 @@ function CompanyProfileContent() {
   const lost = bids.filter((b) => b.result === "lost");
 
   if (loading) return (
-    <div className="min-h-screen bg-gray-50"><Navbar />
-      <div className="flex items-center justify-center py-32">
+    <div className="min-h-screen bg-gray-50"><Sidebar />
+      <div className="ml-56 flex items-center justify-center py-32">
         <div className="animate-spin rounded-full h-10 w-10 border-4 border-gray-200 border-t-[#0D1F3C]" />
       </div>
     </div>
   );
 
   if (!company) return (
-    <div className="min-h-screen bg-gray-50"><Navbar />
-      <div className="max-w-4xl mx-auto px-6 py-12">
+    <div className="min-h-screen bg-gray-50"><Sidebar />
+      <div className="ml-56 max-w-4xl mx-auto px-6 py-12">
         <button onClick={() => router.push("/companies")} className="text-[#0D1F3C] hover:underline text-sm mb-6">&larr; All Companies</button>
         <p className="text-red-600">Company not found.</p>
       </div>
@@ -66,8 +66,8 @@ function CompanyProfileContent() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar />
-      <div className="max-w-6xl mx-auto px-6 py-6">
+      <Sidebar />
+      <div className="ml-56 max-w-6xl mx-auto px-6 py-6">
         <button onClick={() => router.push("/companies")} className="text-[#0D1F3C] hover:underline text-sm mb-4 inline-block">&larr; All Companies</button>
 
         {/* Header */}

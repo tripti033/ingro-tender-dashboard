@@ -4,9 +4,9 @@ import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { type User } from "firebase/auth";
 import { onAuthChange } from "@/lib/auth";
-import { getTenders, getAlerts, updateFlag, type Tender, type Alert } from "@/lib/firestore";
+import { getTenders, updateFlag, type Tender } from "@/lib/firestore";
 import AuthGuard from "@/components/AuthGuard";
-import Navbar from "@/components/Navbar";
+import Sidebar from "@/components/Sidebar";
 
 const AUTHORITIES = [
   "All", "SECI", "NTPC", "GUVNL", "MSEDCL", "RRVUNL", "UJVNL",
@@ -85,8 +85,6 @@ function DashboardContent() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [tenders, setTenders] = useState<Tender[]>([]);
-  const [alerts, setAlerts] = useState<Alert[]>([]);
-  const [alertsOpen, setAlertsOpen] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -94,16 +92,14 @@ function DashboardContent() {
   const [category, setCategory] = useState("All");
   const [authority, setAuthority] = useState("All");
   const [status, setStatus] = useState("All");
-  const [sortBy, setSortBy] = useState("Days Left (asc)");
+  const [sortBy, setSortBy] = useState("Recently Added");
   const [hideClosed, setHideClosed] = useState(false);
 
   useEffect(() => { return onAuthChange(setUser); }, []);
 
   useEffect(() => {
-    Promise.all([
-      getTenders().then(setTenders),
-      getAlerts().then(setAlerts).catch(() => {}),
-    ])
+    getTenders()
+      .then(setTenders)
       .catch(() => setError("Failed to load tenders. Please refresh."))
       .finally(() => setLoading(false));
   }, []);
@@ -178,10 +174,10 @@ function DashboardContent() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar />
+      <Sidebar />
 
       {/* Filter bar */}
-      <div className="sticky top-[52px] z-40 bg-white border-b px-6 py-3">
+      <div className="ml-56 sticky top-0 z-40 bg-white border-b px-6 py-3">
         <div className="flex flex-wrap items-center gap-3">
           <input
             type="text"
@@ -212,34 +208,8 @@ function DashboardContent() {
         </div>
       </div>
 
-      {/* Alerts */}
-      {alerts.length > 0 && (
-        <div className="mx-6 mt-4">
-          <button onClick={() => setAlertsOpen(!alertsOpen)} className="flex items-center gap-2 text-sm font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-t-lg px-4 py-2 w-full text-left hover:bg-amber-100 transition-colors">
-            <span className="text-amber-500">&#9889;</span>
-            Industry Alerts <span className="text-xs font-normal text-amber-600 ml-1">({alerts.length})</span>
-            <span className="ml-auto text-xs text-amber-400">{alertsOpen ? "\u25B2" : "\u25BC"}</span>
-          </button>
-          {alertsOpen && (
-            <div className="border border-t-0 border-amber-200 rounded-b-lg bg-white divide-y divide-amber-100 max-h-48 overflow-y-auto">
-              {alerts.map((alert) => (
-                <div key={alert.id} className="px-4 py-2 flex items-center gap-3 hover:bg-amber-50/50 text-sm">
-                  <span className="flex-1 text-gray-800">{alert.title}</span>
-                  <span className="text-xs text-gray-400 shrink-0">{alert.source}</span>
-                  {alert.sourceUrl && (
-                    <a href={alert.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-[#0D1F3C] hover:underline shrink-0">
-                      Read &rarr;
-                    </a>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
       {/* Table */}
-      <div className="px-6 py-4">
+      <div className="ml-56 px-6 py-4">
         {loading ? (
           <div className="space-y-3">
             {[...Array(8)].map((_, i) => (<div key={i} className="h-12 bg-gray-100 rounded animate-pulse" />))}

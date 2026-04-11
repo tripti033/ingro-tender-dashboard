@@ -8,7 +8,7 @@ import { db } from "@/lib/firebase";
 import { onAuthChange } from "@/lib/auth";
 import { updateFlag, updateNote, updateTender, getEditHistory, getBidsByTender, type Tender, type EditHistoryEntry, type Bid } from "@/lib/firestore";
 import AuthGuard from "@/components/AuthGuard";
-import Navbar from "@/components/Navbar";
+import Sidebar from "@/components/Sidebar";
 
 const FLAG_OPTIONS = [
   { label: "Watching", color: "border-blue-500 bg-blue-50 text-blue-700" },
@@ -349,10 +349,10 @@ function TenderDetailContent() {
     try { await updateNote(tender.nitNumber, user.uid, noteText); setNoteSaved(true); setTimeout(() => setNoteSaved(false), 2000); } catch { /* */ }
   };
 
-  if (loading) return <div className="min-h-screen bg-gray-50"><Navbar /><div className="flex items-center justify-center py-32"><div className="animate-spin rounded-full h-10 w-10 border-4 border-gray-200 border-t-[#0D1F3C]" /></div></div>;
+  if (loading) return <div className="min-h-screen bg-gray-50"><Sidebar /><div className="ml-56 flex items-center justify-center py-32"><div className="animate-spin rounded-full h-10 w-10 border-4 border-gray-200 border-t-[#0D1F3C]" /></div></div>;
 
   if (error || !tender) return (
-    <div className="min-h-screen bg-gray-50"><Navbar /><div className="max-w-4xl mx-auto px-6 py-12">
+    <div className="min-h-screen bg-gray-50"><Sidebar /><div className="ml-56 max-w-4xl mx-auto px-6 py-12">
       <button onClick={() => router.push("/dashboard")} className="text-[#0D1F3C] hover:underline text-sm mb-6">&larr; All Tenders</button>
       <p className="text-red-600">{error || "Tender not found."}</p>
     </div></div>
@@ -362,8 +362,8 @@ function TenderDetailContent() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar />
-      <div className="max-w-7xl mx-auto px-6 py-6">
+      <Sidebar />
+      <div className="ml-56 max-w-7xl mx-auto px-6 py-6">
         <div className="flex items-center justify-between mb-4">
           <button onClick={() => router.push("/dashboard")} className="text-[#0D1F3C] hover:underline text-sm">&larr; All Tenders</button>
           {!editing ? (

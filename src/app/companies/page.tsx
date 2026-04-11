@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { getCompanies, type Company } from "@/lib/firestore";
 import AuthGuard from "@/components/AuthGuard";
-import Navbar from "@/components/Navbar";
+import Sidebar from "@/components/Sidebar";
 
 const TYPE_OPTIONS = ["All", "Developer", "Board", "Private", "Other"];
 const SORT_OPTIONS = ["Name (A-Z)", "Bids Won (desc)", "Bids Lost (desc)", "Capacity (desc)"];
@@ -52,8 +52,8 @@ function CompaniesContent() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar />
-      <div className="px-6 py-4">
+      <Sidebar />
+      <div className="ml-56 px-6 py-4">
         <h1 className="text-xl font-bold text-gray-900 mb-4">Companies</h1>
 
         <div className="flex flex-wrap items-center gap-3 mb-4">
