@@ -156,10 +156,10 @@ async function main() {
   }
   console.log("==================\n");
 
-  // Exit with code 1 if more than 2 sources failed
-  if (failedCount > 2) {
+  // Exit with code 1 if more than 5 sources failed (gov sites are often slow/down)
+  if (failedCount > 5) {
     console.error(
-      `${failedCount} sources failed (threshold: 2). Exiting with error.`
+      `${failedCount} sources failed (threshold: 5). Exiting with error.`
     );
     process.exit(1);
   }

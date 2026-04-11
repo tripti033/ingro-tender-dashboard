@@ -21,7 +21,7 @@ export async function scrapeGuvnl() {
   page.setDefaultTimeout(60000);
 
   try {
-    await page.goto(GUVNL_URL, { waitUntil: "networkidle" });
+    await page.goto(GUVNL_URL, { waitUntil: "domcontentloaded", timeout: 45000 });
 
     // Wait for the main tender table
     await page

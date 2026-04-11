@@ -23,7 +23,7 @@ export async function scrapeNtpc() {
   page.setDefaultTimeout(60000);
 
   try {
-    await page.goto(NTPC_URL, { waitUntil: "networkidle" });
+    await page.goto(NTPC_URL, { waitUntil: "domcontentloaded", timeout: 45000 });
 
     // Wait for the results table
     await page

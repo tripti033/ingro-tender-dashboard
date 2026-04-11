@@ -89,7 +89,7 @@ export async function scrapeGem() {
           }
         });
 
-        await page.goto(GEM_BIDS_URL, { waitUntil: "networkidle" });
+        await page.goto(GEM_BIDS_URL, { waitUntil: "domcontentloaded", timeout: 45000 });
         await page.waitForTimeout(3000);
 
         // Search using the searchBid input

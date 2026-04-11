@@ -60,7 +60,7 @@ export async function scrapeSeci() {
  */
 async function scrapeListingPage(page, url, tenderMap) {
   try {
-    await page.goto(url, { waitUntil: "networkidle" });
+    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 45000 });
     await page.waitForTimeout(3000);
 
     const rows = await page.evaluate(() => {
@@ -139,7 +139,7 @@ async function scrapeListingPage(page, url, tenderMap) {
  * Key Dates (table[8]), Documents (table[9]).
  */
 async function extractDetailPage(page, tender) {
-  await page.goto(tender.detailUrl, { waitUntil: "networkidle" });
+  await page.goto(tender.detailUrl, { waitUntil: "domcontentloaded", timeout: 45000 });
   await page.waitForTimeout(2000);
 
   const details = await page.evaluate(() => {

@@ -15,7 +15,7 @@ const USER_AGENT =
 export async function scrapeMsedcl() {
   const response = await axios.get(MSEDCL_URL, {
     headers: { "User-Agent": USER_AGENT },
-    timeout: 30000,
+    timeout: 45000,
   });
 
   const $ = cheerio.load(response.data);

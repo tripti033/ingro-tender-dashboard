@@ -51,7 +51,7 @@ export async function scrapeEprocure() {
   try {
     for (const term of SEARCH_TERMS) {
       try {
-        await page.goto(EPROCURE_URL, { waitUntil: "networkidle" });
+        await page.goto(EPROCURE_URL, { waitUntil: "domcontentloaded", timeout: 45000 });
         await page.waitForTimeout(2000);
 
         const searchInput = await page.$("#SearchDescription");
