@@ -6,6 +6,8 @@ import { scrapeGuvnl } from "./sources/guvnl.js";
 import { scrapeMsedcl } from "./sources/msedcl.js";
 import { scrapeEprocure } from "./sources/eprocure.js";
 import { scrapeGem } from "./sources/gem.js";
+import { scrapeIreda } from "./sources/ireda.js";
+import { scrapePowergrid } from "./sources/powergrid.js";
 import { normaliseToSchema } from "./normaliser.js";
 import { deduplicate } from "./dedup.js";
 import { writeTenders, writeAlerts, writeIngestionLog } from "./firestore.js";
@@ -23,6 +25,8 @@ const SOURCES = [
   { name: "MSEDCL", fn: scrapeMsedcl },
   { name: "eProcure", fn: scrapeEprocure },
   { name: "GeM", fn: scrapeGem },
+  { name: "IREDA", fn: scrapeIreda },
+  { name: "POWERGRID", fn: scrapePowergrid },
 ];
 
 async function main() {
