@@ -118,9 +118,17 @@ export async function updateTender(
     const oldNorm = oldTender[key] ?? null;
     const newNorm = data[key] ?? null;
     if (oldNorm === null && newNorm === null) continue;
-    const oldMs = oldNorm && typeof (oldNorm as { toMillis?: () => number }).toMillis === "function" ? (oldNorm as Timestamp).toMillis() : oldNorm;
-    const newMs = newNorm && typeof (newNorm as { toMillis?: () => number }).toMillis === "function" ? (newNorm as Timestamp).toMillis() : newNorm;
-    if (oldMs !== newMs) changes[key] = { from: formatVal(oldNorm), to: formatVal(newNorm) };
+    // For Timestamps, compare by date string (day level) not milliseconds
+    const isOldTs = oldNorm && typeof (oldNorm as { toDate?: () => Date }).toDate === "function";
+    const isNewTs = newNorm && typeof (newNorm as { toDate?: () => Date }).toDate === "function";
+    if (isOldTs && isNewTs) {
+      const oldDay = (oldNorm as Timestamp).toDate().toISOString().slice(0, 10);
+      const newDay = (newNorm as Timestamp).toDate().toISOString().slice(0, 10);
+      if (oldDay === newDay) continue; // Same date — skip
+    }
+    const oldCmp = isOldTs ? (oldNorm as Timestamp).toMillis() : oldNorm;
+    const newCmp = isNewTs ? (newNorm as Timestamp).toMillis() : newNorm;
+    if (oldCmp !== newCmp) changes[key] = { from: formatVal(oldNorm), to: formatVal(newNorm) };
   }
   if (Object.keys(changes).length > 0) {
     await addDoc(collection(db, "tenders", tenderId, "editHistory"), {
