@@ -76,8 +76,9 @@ export async function scrapeNtpc() {
               (c) => c.textContent?.trim().replace(/\s+/g, " ") || ""
             );
 
-            const viewLink = tr.querySelector("a[href]");
-            const detailUrl = viewLink ? viewLink.href : null;
+            // Get the detail page link (pattern: /NITDetails/NITs/{id})
+            const detailLink = tr.querySelector('a[href*="NITDetails/NITs"]');
+            const detailUrl = detailLink ? detailLink.href : null;
 
             results.push({ cells: cellTexts, detailUrl });
           });
@@ -131,9 +132,88 @@ export async function scrapeNtpc() {
     }
 
     const tenders = Array.from(allTenders.values());
+
+    // Navigate to detail page for each BESS tender to extract docs + extra fields
+    for (const tender of tenders) {
+      if (tender.detailUrl) {
+        try {
+          await page.waitForTimeout(2000);
+          await extractDetailPage(page, tender);
+        } catch (err) {
+          console.log(`[NTPC] Detail failed for ${tender.nitNumber}: ${err.message}`);
+        }
+      }
+    }
+
     console.log(`[NTPC] Found ${tenders.length} BESS tenders total`);
     return tenders;
   } finally {
     await browser.close();
   }
+}
+
+/**
+ * Navigate to NTPC tender detail page and extract documents + extra fields.
+ * Detail URL: /NITDetails/NITs/{id}
+ * Fields: Source of NIT, State, NIT No., Description, Closing Date, Bid Opening Date, Contact Info
+ * Documents: "NIT Download" PDF link at /Uploads/job_{id}.pdf
+ */
+async function extractDetailPage(page, tender) {
+  await page.goto(tender.detailUrl, { waitUntil: "domcontentloaded", timeout: 45000 });
+  await page.waitForTimeout(2000);
+
+  const details = await page.evaluate(() => {
+    const data = {};
+
+    // Extract label:value pairs from all tables
+    document.querySelectorAll("table tr").forEach((tr) => {
+      const cells = tr.querySelectorAll("td");
+      for (let i = 0; i < cells.length - 1; i += 2) {
+        const label = cells[i]?.textContent?.trim().replace(/\s+/g, " ").replace(/:$/, "") || "";
+        const value = cells[i + 1]?.textContent?.trim().replace(/\s+/g, " ") || "";
+        if (label && value && label.length < 80) data[label] = value;
+      }
+    });
+
+    // Get all document download links
+    const documents = [];
+    document.querySelectorAll("a[href]").forEach((a) => {
+      const href = a.href;
+      const name = a.textContent?.trim() || "";
+      if (
+        href.includes("/Uploads/") &&
+        href.match(/\.(pdf|doc|xlsx?)$/i)
+      ) {
+        if (!documents.some((d) => d.url === href)) {
+          documents.push({ name: name || href.split("/").pop(), url: href, uploadDate: null });
+        }
+      }
+    });
+    data._documents = documents;
+
+    return data;
+  });
+
+  // Map to tender fields
+  tender.description = details["Brief NIT Description"] || null;
+  tender.location = details["State"] || tender.location;
+  tender.detailUrl = tender.detailUrl; // keep as sourceUrl
+
+  // Contact info
+  const contact = details["Contact Information"] || "";
+  const emailMatch = contact.match(/E-mail:\s*([\w.+-]+@[\w.-]+)/i);
+  tender.contactEmail = emailMatch ? emailMatch[1] : null;
+
+  // Dates
+  const bidOpen = details["Bid Opening Date"];
+  if (bidOpen) tender.techBidOpeningDate = bidOpen.split(" ")[0];
+
+  // Documents
+  const docs = details._documents || [];
+  if (docs.length > 0) {
+    tender.documents = docs;
+    tender.documentLink = docs[0].url;
+  }
+
+  console.log(`[NTPC] Detail: ${tender.nitNumber} — ${docs.length} docs, state: ${tender.location || "-"}`);
 }
