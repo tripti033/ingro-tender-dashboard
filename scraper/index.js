@@ -8,6 +8,7 @@ import { scrapeEprocure } from "./sources/eprocure.js";
 import { scrapeGem } from "./sources/gem.js";
 import { scrapeIreda } from "./sources/ireda.js";
 import { scrapePowergrid } from "./sources/powergrid.js";
+import { scrapeUktenders } from "./sources/uktenders.js";
 import { normaliseToSchema } from "./normaliser.js";
 import { deduplicate } from "./dedup.js";
 import { writeTenders, writeAlerts, writeIngestionLog } from "./firestore.js";
@@ -27,6 +28,7 @@ const SOURCES = [
   { name: "GeM", fn: scrapeGem },
   { name: "IREDA", fn: scrapeIreda },
   { name: "POWERGRID", fn: scrapePowergrid },
+  { name: "uktenders", fn: scrapeUktenders },
 ];
 
 async function main() {
