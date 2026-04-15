@@ -93,7 +93,7 @@ function DashboardContent() {
   const [authority, setAuthority] = useState("All");
   const [status, setStatus] = useState("All");
   const [sortBy, setSortBy] = useState("Recently Added");
-  const [hideClosed, setHideClosed] = useState(false);
+  const [hideClosed, setHideClosed] = useState(true);
 
   useEffect(() => { return onAuthChange(setUser); }, []);
 
