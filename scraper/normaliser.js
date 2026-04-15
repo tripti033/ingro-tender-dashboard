@@ -142,7 +142,7 @@ function detectTenderMode(text) {
  */
 function detectAuthorityType(authority) {
   const central = ["SECI", "NTPC", "SJVNL", "NVVN", "UJVNL", "NHPC", "PGCIL", "POWERGRID", "MNRE", "CEA", "IREDA"];
-  const state = ["GUVNL", "MSEDCL", "TNGECL", "RRVUNL", "DHBVN", "WBSEDCL", "MSETCL", "UPCL", "UJVNL", "PTCUL"];
+  const state = ["GUVNL", "MSEDCL", "TNGECL", "RRVUNL", "DHBVN", "WBSEDCL", "MSETCL", "UPCL", "UJVNL", "PTCUL", "HPPCL"];
   const marketplace = ["eProcure", "GeM"];
 
   if (!authority) return null;
