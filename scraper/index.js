@@ -11,6 +11,7 @@ import { scrapePowergrid } from "./sources/powergrid.js";
 import { scrapeUktenders } from "./sources/uktenders.js";
 import { scrapeHppcl } from "./sources/hppcl.js";
 import { scrapeTenderDetail } from "./sources/tenderdetail.js";
+import { scrapeNgel } from "./sources/ngel.js";
 import { normaliseToSchema } from "./normaliser.js";
 import { deduplicate } from "./dedup.js";
 import { writeTenders, writeAlerts, writeIngestionLog } from "./firestore.js";
@@ -33,6 +34,7 @@ const SOURCES = [
   { name: "uktenders", fn: scrapeUktenders },
   { name: "HPPCL", fn: scrapeHppcl },
   { name: "TenderDetail", fn: scrapeTenderDetail },
+  { name: "NGEL", fn: scrapeNgel },
 ];
 
 async function main() {
