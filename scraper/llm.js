@@ -95,7 +95,7 @@ export async function callLlm(prompt, systemPrompt = null) {
       stream: false,
       options: {
         temperature: 0.1, // low temp for consistent extraction
-        num_predict: 512,
+        num_predict: 1024,
       },
     };
     if (systemPrompt) body.system = systemPrompt;
@@ -237,51 +237,33 @@ export async function extractPdfFields(pdfText, tenderTitle = "") {
 
   const systemPrompt = `You are a data extraction assistant for Indian BESS (Battery Energy Storage System) bid documents. Extract structured fields from tender RfS/RfP document excerpts and respond ONLY with valid JSON. No explanation. Use null for missing values.`;
 
-  const prompt = `Extract bid document fields from the text excerpts below. Tender title: "${tenderTitle}"
+  const prompt = `Extract fields from this Indian BESS tender document. Tender: "${tenderTitle}"
 
-Return JSON with these fields (use null if missing):
+Return a FLAT JSON object (no nesting) with these keys:
+minimumBidSize, maxAllocationPerBidder, gridConnected, roundTripEfficiency, minimumAnnualAvailability, dailyCycles, financialClosure, scodMonths, gracePeriod, tenderProcessingFee, tenderDocumentFee, vgfAmount, emdAmount, pbgAmount, successCharges, paymentSecurityFund, portalRegistrationFee, biddingStructure, bespaSigning, connectivityType, contactPerson, contactEmail, contactPhone
 
-Technical:
-- minimumBidSize: string (e.g. "50 MW x 2h = 100 MWh")
-- maxAllocationPerBidder: string (e.g. "500 MW / 1000 MWh")
-- gridConnected: string ("Yes" or "No")
-- roundTripEfficiency: string (e.g. "≥85%")
-- minimumAnnualAvailability: string (e.g. "≥95%")
-- dailyCycles: number
+Rules: All amounts in INR as plain numbers. Strings for text fields. null if not found.
 
-Financial (all amounts in INR as numbers, no commas):
-- financialClosure: string (e.g. "12 Months")
-- scodMonths: string (e.g. "18 Months")
-- gracePeriod: string (e.g. "6 Months")
-- tenderProcessingFee: number
-- tenderDocumentFee: number
-- vgfAmount: number
-- emdAmount: number
-- pbgAmount: number
-- successCharges: number
-- paymentSecurityFund: number
-- portalRegistrationFee: number
+Example: {"emdAmount": 5000000, "biddingStructure": "Two-Envelope + e-Reverse Auction", "roundTripEfficiency": ">=85%", "contactEmail": "abc@seci.co.in"}
 
-Structure:
-- biddingStructure: string (e.g. "Two-Envelope + e-Reverse Auction")
-- bespaSigning: string (e.g. "30 Days")
-- connectivityType: string ("ISTS" or "STU / ISC")
-
-Contact:
-- contactPerson: string (name and designation)
-- contactEmail: string
-- contactPhone: string
-
-Document excerpts:
-"""
-${text}
-"""
-
-JSON:`;
+Text:
+${text}`;
 
   const result = await callLlm(prompt, systemPrompt);
   if (!result) return null;
 
-  // Light validation — return as-is if it parsed
-  return result;
+  // Flatten if model returned nested structure
+  const flat = {};
+  for (const [key, value] of Object.entries(result)) {
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      // Nested — flatten it
+      for (const [innerKey, innerValue] of Object.entries(value)) {
+        flat[innerKey] = innerValue;
+      }
+    } else {
+      flat[key] = value;
+    }
+  }
+
+  return flat;
 }
