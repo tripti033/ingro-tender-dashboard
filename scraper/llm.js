@@ -114,13 +114,17 @@ export async function callLlm(prompt, systemPrompt = null) {
     }
 
     const data = await resp.json();
-    if (!data.response) return null;
+    if (!data.response) {
+      console.log(`[LLM] Empty response from model`);
+      return null;
+    }
+
+    console.log(`[LLM] Response (${data.response.length} chars): ${data.response.slice(0, 300)}`);
 
     try {
       return JSON.parse(data.response);
     } catch (err) {
       console.log(`[LLM] Failed to parse JSON: ${err.message}`);
-      console.log(`[LLM] Raw: ${data.response.slice(0, 200)}`);
       return null;
     }
   } catch (err) {
@@ -228,7 +232,8 @@ export async function extractPdfFields(pdfText, tenderTitle = "") {
     pdfText.slice(0, 3000),
     "...",
     ...Array.from(chunks),
-  ].join("\n---\n").slice(0, 20000); // 20K total for 3B model
+  ].join("\n---\n").slice(0, 8000); // 8K chars — sweet spot for 3B model speed + coverage
+  console.log(`[LLM] PDF prompt: ${text.length} chars from ${chunks.size} key sections`);
 
   const systemPrompt = `You are a data extraction assistant for Indian BESS (Battery Energy Storage System) bid documents. Extract structured fields from tender RfS/RfP document excerpts and respond ONLY with valid JSON. No explanation. Use null for missing values.`;
 
