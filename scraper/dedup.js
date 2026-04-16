@@ -1,43 +1,58 @@
 /**
  * Deduplicate an array of normalised tenders.
  *
- * Primary dedup: exact NIT number match → same tender.
- * Secondary dedup: if NIT is synthetic, fuzzy match on authority + powerMW + bidDeadline (same day).
- * When duplicates merge: combine sources arrays, keep most complete field values.
+ * Three layers of dedup:
+ * 1. Exact NIT number match → same tender
+ * 2. Fuzzy: powerMW + energyMWh + bidDeadline (same day) → likely same tender
+ * 3. Title similarity: if >60% of words match → likely same tender
+ *
+ * When duplicate found: merge sources arrays, keep most complete field values.
+ * Prefer tenders from direct sources (SECI, NTPC, uktenders) over aggregators (TenderDetail).
  */
 export function deduplicate(tenders) {
-  const seen = new Map(); // nitNumber → merged tender
+  // Sort so direct sources come first — their data is richer
+  const DIRECT_SOURCES = ["SECI", "NTPC", "uktenders", "GeM", "GUVNL", "MSEDCL", "IREDA", "POWERGRID", "HPPCL", "eProcure"];
+  tenders.sort((a, b) => {
+    const aScore = DIRECT_SOURCES.includes(a.sources?.[0]) ? 0 : 1;
+    const bScore = DIRECT_SOURCES.includes(b.sources?.[0]) ? 0 : 1;
+    return aScore - bScore;
+  });
+
+  const result = []; // final deduplicated list
 
   for (const tender of tenders) {
-    // Primary dedup: exact NIT match
-    if (seen.has(tender.nitNumber)) {
-      const existing = seen.get(tender.nitNumber);
-      seen.set(tender.nitNumber, mergeTenders(existing, tender));
-      continue;
-    }
+    let merged = false;
 
-    // Secondary dedup: fuzzy match for synthetic NITs
-    // Synthetic NITs start with SOURCE- prefix, so check if we can match by content
-    const fuzzyKey = buildFuzzyKey(tender);
-    let matched = false;
+    for (let i = 0; i < result.length; i++) {
+      const existing = result[i];
 
-    if (fuzzyKey) {
-      for (const [nit, existing] of seen) {
-        const existingKey = buildFuzzyKey(existing);
-        if (existingKey && fuzzyKey === existingKey) {
-          seen.set(nit, mergeTenders(existing, tender));
-          matched = true;
-          break;
-        }
+      // Layer 1: exact NIT match
+      if (tender.nitNumber === existing.nitNumber) {
+        result[i] = mergeTenders(existing, tender);
+        merged = true;
+        break;
+      }
+
+      // Layer 2: fuzzy match on capacity + deadline
+      if (isFuzzyMatch(existing, tender)) {
+        result[i] = mergeTenders(existing, tender);
+        merged = true;
+        break;
+      }
+
+      // Layer 3: title similarity
+      if (isTitleMatch(existing, tender)) {
+        result[i] = mergeTenders(existing, tender);
+        merged = true;
+        break;
       }
     }
 
-    if (!matched) {
-      seen.set(tender.nitNumber, tender);
+    if (!merged) {
+      result.push(tender);
     }
   }
 
-  const result = Array.from(seen.values());
   const deduped = tenders.length - result.length;
   if (deduped > 0) {
     console.log(
@@ -49,26 +64,99 @@ export function deduplicate(tenders) {
 }
 
 /**
- * Build a fuzzy key from authority + powerMW + bidDeadline date (YYYY-MM-DD).
- * Returns null if not enough data for meaningful fuzzy matching.
+ * Fuzzy match: same powerMW + energyMWh + bidDeadline (same day).
+ * Both must have powerMW and energyMWh to match.
  */
-function buildFuzzyKey(tender) {
-  if (!tender.authority || !tender.powerMW) return null;
+function isFuzzyMatch(a, b) {
+  // Both must have capacity data
+  if (!a.powerMW || !b.powerMW) return false;
+  if (a.powerMW !== b.powerMW) return false;
 
-  let dateStr = "nodate";
-  if (tender.bidDeadline) {
-    // Firestore Timestamp has toDate(), plain dates work too
-    const d =
-      typeof tender.bidDeadline.toDate === "function"
-        ? tender.bidDeadline.toDate()
-        : new Date(tender.bidDeadline);
+  // If both have energyMWh, they must match
+  if (a.energyMWh && b.energyMWh && a.energyMWh !== b.energyMWh) return false;
 
-    if (!isNaN(d.getTime())) {
-      dateStr = d.toISOString().slice(0, 10);
+  // If both have deadlines, they must be the same day
+  const aDate = getDateStr(a.bidDeadline);
+  const bDate = getDateStr(b.bidDeadline);
+  if (aDate && bDate && aDate !== bDate) return false;
+
+  // If capacity matches and dates match (or one is missing), it's a match
+  return true;
+}
+
+/**
+ * Title similarity match: if >60% of significant words overlap.
+ * Catches cases like "500 MW/1000 MWh Standalone BESS Punjab" from two sources.
+ */
+function isTitleMatch(a, b) {
+  const aWords = getSignificantWords(a.title);
+  const bWords = getSignificantWords(b.title);
+
+  if (aWords.size < 3 || bWords.size < 3) return false;
+
+  // Count overlap
+  let overlap = 0;
+  for (const word of aWords) {
+    if (bWords.has(word)) overlap++;
+  }
+
+  const minSize = Math.min(aWords.size, bWords.size);
+  const similarity = overlap / minSize;
+
+  return similarity >= 0.6 && overlap >= 4;
+}
+
+/**
+ * Extract significant words from a title (ignore common filler words).
+ */
+function getSignificantWords(title) {
+  if (!title) return new Set();
+
+  const STOP_WORDS = new Set([
+    "the", "of", "for", "and", "in", "at", "to", "a", "an", "by", "on",
+    "with", "from", "under", "tender", "tenders", "bid", "bids", "corrigendum",
+    "implementation", "setting", "up", "supply", "design", "construction",
+    "erection", "testing", "commissioning", "operation", "maintenance",
+    "project", "projects", "system", "systems", "based", "competitive",
+    "bidding", "mechanism", "selection", "eligible", "bidders",
+    "rfs", "request", "notice", "nit", "eoi", "expression", "interest",
+  ]);
+
+  return new Set(
+    title
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ")
+      .split(/\s+/)
+      .filter((w) => w.length > 2 && !STOP_WORDS.has(w))
+  );
+}
+
+/**
+ * Extract YYYY-MM-DD string from a deadline value.
+ */
+function getDateStr(deadline) {
+  if (!deadline) return null;
+
+  // Firestore Timestamp
+  if (typeof deadline.toDate === "function") {
+    return deadline.toDate().toISOString().slice(0, 10);
+  }
+
+  // String date — try to parse
+  if (typeof deadline === "string") {
+    // "Apr 20, 2026" or "20-Apr-2026" or "20/04/2026"
+    const d = new Date(deadline);
+    if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+
+    // DD-MM-YYYY or DD/MM/YYYY
+    const dmy = deadline.match(/(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+    if (dmy) {
+      const d2 = new Date(parseInt(dmy[3]), parseInt(dmy[2]) - 1, parseInt(dmy[1]));
+      if (!isNaN(d2.getTime())) return d2.toISOString().slice(0, 10);
     }
   }
 
-  return `${tender.authority}|${tender.powerMW}|${dateStr}`;
+  return null;
 }
 
 /**
@@ -85,31 +173,20 @@ function mergeTenders(existing, incoming) {
   ]);
   merged.sources = Array.from(allSources);
 
-  // For each field, prefer the more complete value (non-null over null)
+  // Fields to merge — prefer non-null over null
   const fields = [
-    "title",
-    "category",
-    "tenderMode",
-    "authority",
-    "authorityType",
-    "state",
-    "location",
-    "powerMW",
-    "energyMWh",
-    "durationHours",
-    "connectivityType",
-    "emdAmount",
-    "emdUnit",
-    "biddingStructure",
-    "bidDeadline",
-    "emdDeadline",
-    "preBidDate",
-    "techBidOpeningDate",
-    "financialBidOpeningDate",
-    "bespaSigning",
-    "documentLink",
-    "preBidLink",
-    "sourceUrl",
+    "title", "category", "tenderMode", "authority", "authorityType",
+    "state", "location", "powerMW", "energyMWh", "durationHours",
+    "connectivityType", "emdAmount", "emdUnit", "biddingStructure",
+    "bidDeadline", "emdDeadline", "preBidDate", "techBidOpeningDate",
+    "financialBidOpeningDate", "bespaSigning", "documentLink",
+    "documents", "preBidLink", "sourceUrl",
+    "minimumBidSize", "maxAllocationPerBidder", "gridConnected",
+    "roundTripEfficiency", "minimumAnnualAvailability", "dailyCycles",
+    "financialClosure", "scodMonths", "gracePeriod",
+    "tenderProcessingFee", "tenderDocumentFee", "vgfAmount",
+    "pbgAmount", "successCharges", "paymentSecurityFund",
+    "portalRegistrationFee", "totalCost",
   ];
 
   for (const field of fields) {
@@ -118,10 +195,28 @@ function mergeTenders(existing, incoming) {
     }
   }
 
-  // Recompute derived fields if capacity was filled in
+  // Prefer specific authority over generic aggregator labels
+  const GENERIC_AUTHORITIES = ["TenderDetail", "eProcure", "GeM", "Boards / Undertakings / PSU", "Government Departments", "Local Bodies", "Private Organizations", "Statutory Bodies & Commissions/Committees"];
+  if (GENERIC_AUTHORITIES.includes(merged.authority) && !GENERIC_AUTHORITIES.includes(incoming.authority) && incoming.authority) {
+    merged.authority = incoming.authority;
+    merged.authorityType = incoming.authorityType;
+  }
+
+  // Merge documents arrays
+  if (incoming.documents && Array.isArray(incoming.documents)) {
+    const existingDocs = merged.documents || [];
+    const allDocs = [...existingDocs];
+    for (const doc of incoming.documents) {
+      if (!allDocs.some((d) => d.url === doc.url)) {
+        allDocs.push(doc);
+      }
+    }
+    if (allDocs.length > 0) merged.documents = allDocs;
+  }
+
+  // Recompute derived fields
   if (merged.powerMW && merged.energyMWh && !merged.durationHours) {
-    merged.durationHours =
-      Math.round((merged.energyMWh / merged.powerMW) * 100) / 100;
+    merged.durationHours = Math.round((merged.energyMWh / merged.powerMW) * 100) / 100;
   }
 
   // VGF: true if either source says true
