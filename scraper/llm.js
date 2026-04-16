@@ -269,6 +269,46 @@ ${text}`;
 }
 
 /**
+ * Process an industry alert with LLM: score, categorize, extract entities, detect if tender.
+ * Returns: { relevanceScore, category, entities, isTenderAnnouncement, draftTender }
+ */
+export async function processAlert(title, sourceUrl = "") {
+  const prompt = `Analyze this Indian energy industry news headline for a BESS (Battery Energy Storage System) company.
+
+Headline: "${title}"
+Source: ${sourceUrl}
+
+Return a FLAT JSON with:
+- relevanceScore: number 1-10 (10=directly about BESS tender, 7-9=BESS related, 4-6=energy sector relevant, 1-3=barely relevant)
+- category: string (must be one of: "Tender Announcement", "Policy/Regulatory", "Market Update", "Technology", "Competition", "Opportunity", "General")
+- authorities: array of strings (any mentioned: SECI, NTPC, GUVNL, MSEDCL, MNRE, CEA, PGCIL etc. or null)
+- companies: array of strings (any company names mentioned, or null)
+- states: array of strings (any Indian states mentioned, or null)
+- powerMW: number or null (if MW capacity mentioned)
+- energyMWh: number or null (if MWh mentioned)
+- isTenderAnnouncement: boolean (true if this headline IS about a new tender being issued/floated)
+- oneLinerInsight: string (1 sentence actionable insight for the BESS team)
+
+Example: {"relevanceScore": 8, "category": "Tender Announcement", "authorities": ["SECI"], "companies": null, "states": ["Rajasthan"], "powerMW": 500, "energyMWh": 2000, "isTenderAnnouncement": true, "oneLinerInsight": "New SECI 500MW BESS tender in Rajasthan — check eligibility and bid deadline."}`;
+
+  const result = await callLlm(prompt, "You are an energy industry analyst for an Indian BESS company. Respond ONLY with valid JSON.");
+  if (!result) return null;
+
+  // Validate relevanceScore
+  if (typeof result.relevanceScore === "number") {
+    result.relevanceScore = Math.min(10, Math.max(1, Math.round(result.relevanceScore)));
+  }
+
+  // Validate category
+  const validCategories = ["Tender Announcement", "Policy/Regulatory", "Market Update", "Technology", "Competition", "Opportunity", "General"];
+  if (!validCategories.includes(result.category)) {
+    result.category = "General";
+  }
+
+  return result;
+}
+
+/**
  * Generate a summary paragraph covering important tender info NOT in structured fields.
  * Covers: eligibility criteria, technical specs (battery chemistry, cycle life, warranty),
  * penalty clauses, land/grid requirements, commercial terms, special conditions.

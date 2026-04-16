@@ -257,6 +257,14 @@ export interface Alert {
   energyMWh: number | null;
   category: string | null;
   createdAt: Timestamp | null;
+  // LLM-enriched fields
+  relevanceScore: number | null;
+  alertCategory: string | null;
+  authorities: string[] | null;
+  companies: string[] | null;
+  states: string[] | null;
+  isTenderAnnouncement: boolean | null;
+  oneLinerInsight: string | null;
 }
 
 export async function getAlerts(max = 20): Promise<Alert[]> {
