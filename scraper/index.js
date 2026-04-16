@@ -11,7 +11,7 @@ import { scrapePowergrid } from "./sources/powergrid.js";
 import { scrapeUktenders } from "./sources/uktenders.js";
 import { scrapeHppcl } from "./sources/hppcl.js";
 import { scrapeTenderDetail } from "./sources/tenderdetail.js";
-import { normaliseToSchema } from "./normaliser.js";
+import { normaliseWithLlm } from "./normaliser.js";
 import { deduplicate } from "./dedup.js";
 import { writeTenders, writeAlerts, writeIngestionLog } from "./firestore.js";
 
@@ -91,18 +91,17 @@ async function main() {
 
   console.log(`\nRaw tenders collected: ${allRawTenders.length}`);
 
-  // Normalise all raw tenders to the unified schema
-  const normalised = allRawTenders
-    .map(({ raw, source }) => {
-      try {
-        return normaliseToSchema(raw, source);
-      } catch (err) {
-        console.error(`[Normalise] Error for ${source}: ${err.message}`);
-        errors.push(`Normalise error (${source}): ${err.message}`);
-        return null;
-      }
-    })
-    .filter(Boolean);
+  // Normalise all raw tenders — uses LLM fallback if Ollama is running
+  const normalised = [];
+  for (const { raw, source } of allRawTenders) {
+    try {
+      const result = await normaliseWithLlm(raw, source);
+      if (result) normalised.push(result);
+    } catch (err) {
+      console.error(`[Normalise] Error for ${source}: ${err.message}`);
+      errors.push(`Normalise error (${source}): ${err.message}`);
+    }
+  }
 
   console.log(`Normalised tenders: ${normalised.length}`);
 

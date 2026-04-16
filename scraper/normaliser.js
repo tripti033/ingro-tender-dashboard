@@ -1,4 +1,5 @@
 import { Timestamp } from "./firestore.js";
+import { extractTenderFields, isLlmAvailable } from "./llm.js";
 
 /**
  * Parse a date string in various formats into a JS Date object.
@@ -229,4 +230,65 @@ export function normaliseToSchema(rawTender, source) {
     firstSeenAt: Timestamp.now(),
     lastUpdatedAt: Timestamp.now(),
   };
+}
+
+/**
+ * Normalise a raw tender with LLM fallback for weak regex extraction.
+ * Uses LLM when powerMW, energyMWh, category, or location couldn't be regex-extracted.
+ * Falls back gracefully to regex-only if LLM is not available.
+ */
+export async function normaliseWithLlm(rawTender, source) {
+  // First pass: regex extraction
+  const normalised = normaliseToSchema(rawTender, source);
+
+  // Check if LLM is available (cached check after first call)
+  const hasLlm = await isLlmAvailable();
+  if (!hasLlm) return normalised;
+
+  // Determine if we should ask the LLM — only for gaps
+  const hasGaps =
+    normalised.powerMW == null ||
+    normalised.energyMWh == null ||
+    !normalised.category ||
+    !normalised.state ||
+    !normalised.tenderMode ||
+    (normalised.authority && ["TenderDetail", "eProcure", "GeM"].includes(normalised.authority));
+
+  if (!hasGaps) return normalised;
+
+  // Ask the LLM to fill in the gaps
+  const llmResult = await extractTenderFields(
+    rawTender.title || "",
+    rawTender.description || ""
+  );
+  if (!llmResult) return normalised;
+
+  // Merge — prefer regex values, fill in nulls with LLM values
+  if (normalised.powerMW == null && llmResult.powerMW != null)
+    normalised.powerMW = llmResult.powerMW;
+  if (normalised.energyMWh == null && llmResult.energyMWh != null)
+    normalised.energyMWh = llmResult.energyMWh;
+  if ((!normalised.category || normalised.category === "Standalone") && llmResult.category)
+    normalised.category = llmResult.category;
+  if (!normalised.tenderMode && llmResult.tenderMode)
+    normalised.tenderMode = llmResult.tenderMode;
+  if (!normalised.state && llmResult.state)
+    normalised.state = llmResult.state;
+  if (!normalised.location && llmResult.location)
+    normalised.location = llmResult.location;
+  if (!normalised.connectivityType && llmResult.connectivityType)
+    normalised.connectivityType = llmResult.connectivityType;
+
+  // LLM may identify authority better than regex for generic sources
+  if (llmResult.authority && ["TenderDetail", "eProcure", "GeM"].includes(normalised.authority)) {
+    normalised.authority = llmResult.authority;
+    normalised.authorityType = detectAuthorityType(llmResult.authority);
+  }
+
+  // Recompute derived fields
+  if (normalised.powerMW && normalised.energyMWh) {
+    normalised.durationHours = Math.round((normalised.energyMWh / normalised.powerMW) * 100) / 100;
+  }
+
+  return normalised;
 }

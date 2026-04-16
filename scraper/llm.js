@@ -1,0 +1,211 @@
+/**
+ * Local LLM wrapper around Ollama HTTP API.
+ *
+ * Ollama must be running locally (default http://localhost:11434).
+ * Set OLLAMA_URL env var to override. Set OLLAMA_MODEL to change model.
+ *
+ * If Ollama is not running, all functions return null and log a warning.
+ * The scraper falls back to regex parsing when LLM is unavailable.
+ */
+
+const OLLAMA_URL = process.env.OLLAMA_URL || "http://localhost:11434";
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "llama3.2:3b";
+const LLM_TIMEOUT_MS = 30000;
+
+let llmAvailable = null; // cached availability check
+
+/**
+ * Check if Ollama is running and the model is available.
+ * Returns true/false, cached after first call.
+ */
+export async function isLlmAvailable() {
+  if (llmAvailable !== null) return llmAvailable;
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3000);
+    const resp = await fetch(`${OLLAMA_URL}/api/tags`, {
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+
+    if (!resp.ok) {
+      llmAvailable = false;
+      return false;
+    }
+
+    const data = await resp.json();
+    const models = (data.models || []).map((m) => m.name);
+    if (!models.some((m) => m.startsWith(OLLAMA_MODEL.split(":")[0]))) {
+      console.log(
+        `[LLM] Ollama is running but model "${OLLAMA_MODEL}" not found. Available: ${models.join(", ")}`
+      );
+      llmAvailable = false;
+      return false;
+    }
+
+    console.log(`[LLM] Ollama available with model ${OLLAMA_MODEL}`);
+    llmAvailable = true;
+    return true;
+  } catch {
+    console.log("[LLM] Ollama not running — falling back to regex parsing");
+    llmAvailable = false;
+    return false;
+  }
+}
+
+/**
+ * Call Ollama with a prompt and return the parsed JSON response.
+ * Returns null on failure. Uses JSON mode for reliable output.
+ */
+export async function callLlm(prompt, systemPrompt = null) {
+  if (!(await isLlmAvailable())) return null;
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), LLM_TIMEOUT_MS);
+
+    const body = {
+      model: OLLAMA_MODEL,
+      prompt,
+      format: "json",
+      stream: false,
+      options: {
+        temperature: 0.1, // low temp for consistent extraction
+        num_predict: 512,
+      },
+    };
+    if (systemPrompt) body.system = systemPrompt;
+
+    const resp = await fetch(`${OLLAMA_URL}/api/generate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+
+    if (!resp.ok) {
+      console.log(`[LLM] API error: ${resp.status}`);
+      return null;
+    }
+
+    const data = await resp.json();
+    if (!data.response) return null;
+
+    try {
+      return JSON.parse(data.response);
+    } catch (err) {
+      console.log(`[LLM] Failed to parse JSON: ${err.message}`);
+      console.log(`[LLM] Raw: ${data.response.slice(0, 200)}`);
+      return null;
+    }
+  } catch (err) {
+    if (err.name === "AbortError") {
+      console.log("[LLM] Timeout");
+    } else {
+      console.log(`[LLM] Error: ${err.message}`);
+    }
+    return null;
+  }
+}
+
+/**
+ * Extract structured fields from a tender title/description.
+ * Returns: { powerMW, energyMWh, authority, category, tenderMode, location, state, connectivityType }
+ * Any field can be null if not extractable.
+ */
+export async function extractTenderFields(title, description = "") {
+  const text = `${title}\n${description}`.slice(0, 2000);
+
+  const systemPrompt = `You are a data extraction assistant for Indian BESS (Battery Energy Storage System) tenders. Extract structured fields from tender text and respond ONLY with valid JSON. No explanation.`;
+
+  const prompt = `Extract these fields from the tender text below. Return null for missing values.
+
+Fields:
+- powerMW: number (MW rating)
+- energyMWh: number (MWh energy capacity)
+- authority: string (SECI, NTPC, GUVNL, MSEDCL, RRVUNL, UPCL, SJVNL, TNGECL, NHPC, PGCIL, IREDA, UJVNL, WBSEDCL, MSETCL, DHBVN, etc.)
+- category: string (must be one of: "Standalone", "FDRE", "S+S", "PSP", "Hybrid")
+- tenderMode: string (must be one of: "EPC", "BOOT", "BOO", "BOT", "DBOO", "DBFOO")
+- location: string (city or region)
+- state: string (Indian state name)
+- connectivityType: string ("ISTS" or "STU / ISC")
+
+Tender text:
+"""
+${text}
+"""
+
+JSON:`;
+
+  const result = await callLlm(prompt, systemPrompt);
+  if (!result) return null;
+
+  // Clean up — ensure types are correct
+  const cleaned = {
+    powerMW: typeof result.powerMW === "number" ? result.powerMW : null,
+    energyMWh: typeof result.energyMWh === "number" ? result.energyMWh : null,
+    authority: typeof result.authority === "string" && result.authority.length > 0 ? result.authority.toUpperCase() : null,
+    category: ["Standalone", "FDRE", "S+S", "PSP", "Hybrid"].includes(result.category) ? result.category : null,
+    tenderMode: ["EPC", "BOOT", "BOO", "BOT", "DBOO", "DBFOO"].includes(result.tenderMode) ? result.tenderMode : null,
+    location: typeof result.location === "string" && result.location.length > 0 ? result.location : null,
+    state: typeof result.state === "string" && result.state.length > 0 ? result.state : null,
+    connectivityType: ["ISTS", "STU / ISC"].includes(result.connectivityType) ? result.connectivityType : null,
+  };
+
+  return cleaned;
+}
+
+/**
+ * Extract rich technical + financial fields from bid document text (from PDF).
+ * Returns the full detail schema — 20+ fields.
+ */
+export async function extractPdfFields(pdfText, tenderTitle = "") {
+  const text = pdfText.slice(0, 12000); // keep under 12k chars for 3B model context
+
+  const systemPrompt = `You are a data extraction assistant for Indian BESS (Battery Energy Storage System) bid documents. Extract structured fields from tender RfS/RfP documents and respond ONLY with valid JSON. No explanation. Use null for missing values.`;
+
+  const prompt = `Extract bid document fields from the text below. Tender title: "${tenderTitle}"
+
+Return JSON with these fields (use null if missing):
+
+Technical:
+- minimumBidSize: string (e.g. "50 MW x 2h = 100 MWh")
+- maxAllocationPerBidder: string (e.g. "500 MW / 1000 MWh")
+- gridConnected: string ("Yes" or "No")
+- roundTripEfficiency: string (e.g. "≥85%")
+- minimumAnnualAvailability: string (e.g. "≥95%")
+- dailyCycles: number
+
+Financial (all amounts in INR as numbers, no commas):
+- financialClosure: string (e.g. "12 Months")
+- scodMonths: string (e.g. "18 Months")
+- gracePeriod: string (e.g. "6 Months")
+- tenderProcessingFee: number
+- tenderDocumentFee: number
+- vgfAmount: number
+- emdAmount: number
+- pbgAmount: number
+- successCharges: number
+- paymentSecurityFund: number
+- portalRegistrationFee: number
+
+Structure:
+- biddingStructure: string (e.g. "Two-Envelope + e-Reverse Auction")
+- bespaSigning: string (e.g. "30 Days")
+- connectivityType: string ("ISTS" or "STU / ISC")
+
+Document text:
+"""
+${text}
+"""
+
+JSON:`;
+
+  const result = await callLlm(prompt, systemPrompt);
+  if (!result) return null;
+
+  // Light validation — return as-is if it parsed
+  return result;
+}
