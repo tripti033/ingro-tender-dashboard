@@ -177,7 +177,7 @@ function DashboardContent() {
       <Sidebar />
 
       {/* Filter bar */}
-      <div className="ml-56 sticky top-0 z-40 bg-white border-b px-6 py-3">
+      <div className="sidebar-content sticky top-0 z-40 bg-white border-b px-6 py-3">
         <div className="flex flex-wrap items-center gap-3">
           <input
             type="text"
@@ -209,7 +209,7 @@ function DashboardContent() {
       </div>
 
       {/* Table */}
-      <div className="ml-56 px-6 py-4">
+      <div className="sidebar-content px-6 py-4">
         {loading ? (
           <div className="space-y-3">
             {[...Array(8)].map((_, i) => (<div key={i} className="h-12 bg-gray-100 rounded animate-pulse" />))}

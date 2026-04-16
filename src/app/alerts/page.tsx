@@ -31,7 +31,7 @@ function AlertsContent() {
   }, [alerts, search]);
 
   return (
-    <div className="ml-56 min-h-screen bg-gray-50">
+    <div className="sidebar-content min-h-screen bg-gray-50">
       <div className="px-6 py-6">
         <h1 className="text-xl font-bold text-gray-900 mb-4">Industry Alerts</h1>
 

@@ -28,7 +28,7 @@ function ContactsContent() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Sidebar />
-      <div className="ml-56 px-6 py-4">
+      <div className="sidebar-content px-6 py-4">
         <h1 className="text-xl font-bold text-gray-900 mb-4">Contacts Directory</h1>
 
         <div className="flex items-center gap-3 mb-4">
