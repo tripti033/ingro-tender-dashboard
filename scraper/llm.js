@@ -185,11 +185,54 @@ JSON:`;
  * Returns the full detail schema — 20+ fields.
  */
 export async function extractPdfFields(pdfText, tenderTitle = "") {
-  const text = pdfText.slice(0, 12000); // keep under 12k chars for 3B model context
+  // Extract key sections from the full PDF text instead of just first 12K chars
+  // Look for sections that contain the data we need
+  const keyPhrases = [
+    "EMD", "Earnest Money", "Bid Security",
+    "Tender Fee", "Processing Fee", "Document Fee", "Cost of RfS",
+    "VGF", "Viability Gap",
+    "Performance Bank Guarantee", "PBG",
+    "Financial Closure", "SCOD", "Commissioning",
+    "Grace Period",
+    "Round Trip Efficiency", "RTE",
+    "Annual Availability",
+    "Daily Cycle",
+    "Minimum Bid", "Minimum Capacity", "Minimum Project",
+    "Maximum Allocation", "Maximum Capacity",
+    "Bidding Structure", "e-Reverse Auction", "Two Envelope",
+    "BESPA", "PPA Signing",
+    "Grid Connected", "Connectivity", "ISTS", "STU",
+    "Contact Person", "Contact Detail", "Email", "Phone",
+    "Pre-Bid", "Bid Submission",
+    "Success Charge", "Portal Registration",
+  ];
 
-  const systemPrompt = `You are a data extraction assistant for Indian BESS (Battery Energy Storage System) bid documents. Extract structured fields from tender RfS/RfP documents and respond ONLY with valid JSON. No explanation. Use null for missing values.`;
+  // Extract ~500 chars around each key phrase match
+  const chunks = new Set();
+  const textLower = pdfText.toLowerCase();
+  for (const phrase of keyPhrases) {
+    let idx = 0;
+    const phraseLower = phrase.toLowerCase();
+    while ((idx = textLower.indexOf(phraseLower, idx)) !== -1) {
+      const start = Math.max(0, idx - 200);
+      const end = Math.min(pdfText.length, idx + 300);
+      chunks.add(pdfText.slice(start, end));
+      idx += phrase.length;
+      if (chunks.size >= 30) break; // cap at 30 chunks
+    }
+    if (chunks.size >= 30) break;
+  }
 
-  const prompt = `Extract bid document fields from the text below. Tender title: "${tenderTitle}"
+  // Also include the first 3000 chars (often has summary table)
+  const text = [
+    pdfText.slice(0, 3000),
+    "...",
+    ...Array.from(chunks),
+  ].join("\n---\n").slice(0, 20000); // 20K total for 3B model
+
+  const systemPrompt = `You are a data extraction assistant for Indian BESS (Battery Energy Storage System) bid documents. Extract structured fields from tender RfS/RfP document excerpts and respond ONLY with valid JSON. No explanation. Use null for missing values.`;
+
+  const prompt = `Extract bid document fields from the text excerpts below. Tender title: "${tenderTitle}"
 
 Return JSON with these fields (use null if missing):
 
@@ -219,7 +262,12 @@ Structure:
 - bespaSigning: string (e.g. "30 Days")
 - connectivityType: string ("ISTS" or "STU / ISC")
 
-Document text:
+Contact:
+- contactPerson: string (name and designation)
+- contactEmail: string
+- contactPhone: string
+
+Document excerpts:
 """
 ${text}
 """

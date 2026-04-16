@@ -60,18 +60,37 @@ async function downloadAndExtract(pdfUrl) {
  * Returns the updates object (only fields that were extracted).
  */
 export async function enrichFromPdf(tender) {
-  const pdfUrl = tender.documentLink;
-  if (!pdfUrl || !pdfUrl.toLowerCase().includes(".pdf")) {
+  // Collect all PDF URLs from documents array + documentLink
+  const pdfUrls = new Set();
+  if (tender.documents && Array.isArray(tender.documents)) {
+    for (const d of tender.documents) {
+      if (d.url && d.url.toLowerCase().includes(".pdf")) {
+        pdfUrls.add(d.url);
+      }
+    }
+  }
+  if (tender.documentLink && tender.documentLink.toLowerCase().includes(".pdf")) {
+    pdfUrls.add(tender.documentLink);
+  }
+
+  if (pdfUrls.size === 0) return null;
+
+  // Download and extract text from ALL PDFs, combine
+  let combinedText = "";
+  for (const url of pdfUrls) {
+    const text = await downloadAndExtract(url);
+    if (text && text.length > 100) {
+      combinedText += `\n--- Document: ${url.split("/").pop()} ---\n${text}`;
+    }
+  }
+
+  if (combinedText.length < 500) {
+    console.log(`[PDF] Not enough text from ${pdfUrls.size} PDFs for ${tender.nitNumber}`);
     return null;
   }
 
-  const pdfText = await downloadAndExtract(pdfUrl);
-  if (!pdfText || pdfText.length < 500) {
-    console.log(`[PDF] Empty or too short for ${tender.nitNumber}`);
-    return null;
-  }
-
-  const fields = await extractPdfFields(pdfText, tender.title);
+  console.log(`[PDF] Combined ${pdfUrls.size} docs → ${combinedText.length} chars`);
+  const fields = await extractPdfFields(combinedText, tender.title);
   if (!fields) return null;
 
   // Build update object — only include non-null fields, never overwrite existing
