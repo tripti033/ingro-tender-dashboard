@@ -222,6 +222,12 @@ function TenderDetailContent() {
       biddingStructure: t.biddingStructure || "",
       bespaSigning: t.bespaSigning || "",
       assignedTo: t.assignedTo || "",
+      contactPerson: t.contactPerson || "",
+      contactEmail: t.contactEmail || "",
+      contactPhone: t.contactPhone || "",
+      bidSubmissionOnline: t.bidSubmissionOnline || "",
+      bidSubmissionOffline: t.bidSubmissionOffline || "",
+      bidOpeningDate: t.bidOpeningDate || "",
       preBidDate: tsToInputValue(t.preBidDate),
       preBidLink: t.preBidLink || "",
       bidDeadline: tsToInputValue(t.bidDeadline),
@@ -315,6 +321,12 @@ function TenderDetailContent() {
       totalCost: parseNum(form.totalCost),
       sourceUrl: form.sourceUrl || null,
       assignedTo: form.assignedTo || null,
+      contactPerson: form.contactPerson || null,
+      contactEmail: form.contactEmail || null,
+      contactPhone: form.contactPhone || null,
+      bidSubmissionOnline: form.bidSubmissionOnline || null,
+      bidSubmissionOffline: form.bidSubmissionOffline || null,
+      bidOpeningDate: form.bidOpeningDate || null,
       daysLeft,
       tenderStatus,
     };
@@ -465,6 +477,9 @@ function TenderDetailContent() {
                   <EditDate label="EMD Deadline" value={f("emdDeadline")} onChange={sf("emdDeadline")} />
                   <EditDate label="Tech Bid Opening" value={f("techBidOpeningDate")} onChange={sf("techBidOpeningDate")} />
                   <EditDate label="Financial Bid Opening" value={f("financialBidOpeningDate")} onChange={sf("financialBidOpeningDate")} />
+                  <EditText label="Bid Submission (Online)" value={f("bidSubmissionOnline")} onChange={sf("bidSubmissionOnline")} placeholder="20/04/2026 05:00 PM" />
+                  <EditText label="Bid Submission (Offline)" value={f("bidSubmissionOffline")} onChange={sf("bidSubmissionOffline")} placeholder="22/04/2026 05:00 PM" />
+                  <EditText label="Bid Opening Date" value={f("bidOpeningDate")} onChange={sf("bidOpeningDate")} placeholder="23/04/2026 10:00 AM" />
                   <EditText label="Bid Documents Link" value={f("documentLink")} onChange={sf("documentLink")} placeholder="https://..." />
                   <EditText label="Source URL" value={f("sourceUrl")} onChange={sf("sourceUrl")} placeholder="https://..." />
                 </>
@@ -475,9 +490,35 @@ function TenderDetailContent() {
                   <Row label="EMD Deadline" value={formatFullDate(t.emdDeadline)} />
                   <Row label="Tech Bid Opening" value={formatFullDate(t.techBidOpeningDate)} />
                   <Row label="Financial Bid Opening" value={formatFullDate(t.financialBidOpeningDate)} />
+                  {t.bidSubmissionOnline && <Row label="Submission (Online)" value={t.bidSubmissionOnline} />}
+                  {t.bidSubmissionOffline && <Row label="Submission (Offline)" value={t.bidSubmissionOffline} />}
+                  {t.bidOpeningDate && <Row label="Bid Opening" value={t.bidOpeningDate} />}
                 </>
               )}
             </Section>
+
+            {/* Contact Info — from PDF extraction */}
+            {(t.contactPerson || t.contactEmail || t.contactPhone || editing) && (
+              <Section title="Contact Info">
+                {editing ? (
+                  <>
+                    <EditText label="Contact Person" value={f("contactPerson")} onChange={sf("contactPerson")} placeholder="Name, Designation" />
+                    <EditText label="Email" value={f("contactEmail")} onChange={sf("contactEmail")} placeholder="abc@seci.co.in" />
+                    <EditText label="Phone" value={f("contactPhone")} onChange={sf("contactPhone")} placeholder="+91-..." />
+                  </>
+                ) : (
+                  <>
+                    {t.contactPerson && <Row label="Contact Person" value={t.contactPerson} />}
+                    {t.contactEmail && <Row label="Email" value={
+                      <a href={`mailto:${t.contactEmail}`} className="text-blue-600 hover:underline">{t.contactEmail}</a>
+                    } />}
+                    {t.contactPhone && <Row label="Phone" value={
+                      <a href={`tel:${t.contactPhone}`} className="text-blue-600 hover:underline">{t.contactPhone}</a>
+                    } />}
+                  </>
+                )}
+              </Section>
+            )}
 
             {!editing && (
               <Section title="Documents & Links">

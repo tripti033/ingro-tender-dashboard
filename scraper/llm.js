@@ -240,7 +240,7 @@ export async function extractPdfFields(pdfText, tenderTitle = "") {
   const prompt = `Extract fields from this Indian BESS tender document. Tender: "${tenderTitle}"
 
 Return a FLAT JSON object (no nesting) with these keys:
-minimumBidSize, maxAllocationPerBidder, gridConnected, roundTripEfficiency, minimumAnnualAvailability, dailyCycles, financialClosure, scodMonths, gracePeriod, tenderProcessingFee, tenderDocumentFee, vgfAmount, emdAmount, pbgAmount, successCharges, paymentSecurityFund, portalRegistrationFee, biddingStructure, bespaSigning, connectivityType, contactPerson, contactEmail, contactPhone
+minimumBidSize, maxAllocationPerBidder, gridConnected, roundTripEfficiency, minimumAnnualAvailability, dailyCycles, financialClosure, scodMonths, gracePeriod, tenderProcessingFee, tenderDocumentFee, vgfAmount, emdAmount, pbgAmount, successCharges, paymentSecurityFund, portalRegistrationFee, biddingStructure, bespaSigning, connectivityType, contactPerson, contactEmail, contactPhone, bidSubmissionOnline, bidSubmissionOffline, bidOpeningDate
 
 Rules: All amounts in INR as plain numbers. Strings for text fields. null if not found.
 

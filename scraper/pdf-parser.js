@@ -116,6 +116,12 @@ export async function enrichFromPdf(tender) {
     "biddingStructure",
     "bespaSigning",
     "connectivityType",
+    "contactPerson",
+    "contactEmail",
+    "contactPhone",
+    "bidSubmissionOnline",
+    "bidSubmissionOffline",
+    "bidOpeningDate",
   ];
 
   for (const field of fieldsToFill) {

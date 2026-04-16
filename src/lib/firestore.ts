@@ -60,6 +60,17 @@ export interface Tender {
   portalRegistrationFee: number | null;
   totalCost: number | null;
   documents: { name: string; url: string; uploadDate: string | null }[] | null;
+
+  // Contact Info (from PDF extraction)
+  contactPerson: string | null;
+  contactEmail: string | null;
+  contactPhone: string | null;
+
+  // Additional dates (from PDF — more precise)
+  bidSubmissionOnline: string | null;
+  bidSubmissionOffline: string | null;
+  bidOpeningDate: string | null;
+
   daysLeft: number | null;
   tenderStatus: string;
   sourceUrl: string | null;
