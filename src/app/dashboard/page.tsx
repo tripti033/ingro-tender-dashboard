@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { type User } from "firebase/auth";
 import { onAuthChange } from "@/lib/auth";
-import { getTenders, updateFlag, type Tender } from "@/lib/firestore";
+import { getTenders, updateFlag, markAsRead, toggleRead, type Tender } from "@/lib/firestore";
 import AuthGuard from "@/components/AuthGuard";
 import Sidebar from "@/components/Sidebar";
 
@@ -205,6 +205,10 @@ function DashboardContent() {
           <span className="text-sm text-gray-400 ml-auto">
             Showing {filtered.length} of {tenders.length} tenders
           </span>
+          <button onClick={() => router.push("/tender/new")}
+            className="bg-[#0D1F3C] text-white px-3 py-2 rounded-lg text-sm hover:bg-[#162d52] transition-colors">
+            + New Tender
+          </button>
         </div>
       </div>
 
@@ -223,6 +227,7 @@ function DashboardContent() {
             <table className="w-full text-sm">
               <thead className="bg-gray-50 text-left text-gray-500 font-medium text-xs uppercase tracking-wider">
                 <tr>
+                  <th className="px-1 py-3 w-6"></th>
                   <th className="px-3 py-3 whitespace-nowrap">NIT Number</th>
                   <th className="px-3 py-3">Authority</th>
                   <th className="px-3 py-3">Category</th>
@@ -244,9 +249,28 @@ function DashboardContent() {
                 {filtered.map((t) => (
                   <tr
                     key={t.nitNumber}
-                    onClick={() => router.push(`/tender/${encodeURIComponent(t.nitNumber)}`)}
+                    onClick={() => {
+                      if (user && (!t.readBy || !t.readBy[user.uid])) {
+                        markAsRead(t.nitNumber, user.uid);
+                        setTenders(prev => prev.map(x => x.nitNumber === t.nitNumber ? { ...x, readBy: { ...x.readBy, [user.uid]: Date.now() } } : x));
+                      }
+                      router.push(`/tender/${encodeURIComponent(t.nitNumber)}`);
+                    }}
                     className={`hover:bg-gray-50 cursor-pointer transition-colors ${getRowStyle(t)}`}
                   >
+                    <td className="px-1 py-2.5 w-6 text-center" onClick={(e) => {
+                      e.stopPropagation();
+                      if (!user) return;
+                      const isRead = !!(t.readBy && t.readBy[user.uid]);
+                      toggleRead(t.nitNumber, user.uid, !isRead);
+                      setTenders(prev => prev.map(x => x.nitNumber === t.nitNumber
+                        ? { ...x, readBy: { ...x.readBy, [user.uid]: isRead ? undefined as unknown as number : Date.now() } }
+                        : x));
+                    }}>
+                      {user && (!t.readBy || !t.readBy[user.uid]) && (
+                        <span className="inline-block w-2.5 h-2.5 rounded-full bg-blue-500" title="Unread" />
+                      )}
+                    </td>
                     <td className="px-3 py-2.5 font-mono text-xs whitespace-nowrap" title={t.nitNumber}>
                       {truncate(t.nitNumber, 25)}
                     </td>

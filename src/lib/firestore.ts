@@ -74,6 +74,13 @@ export interface Tender {
   bidSubmissionOffline: string | null;
   bidOpeningDate: string | null;
 
+  // Award / Development tracking
+  awardedTo: string | null;        // Company that won the bid
+  developedBy: string | null;      // Company that develops/executes
+
+  // Read tracking (per user)
+  readBy: Record<string, number> | null;  // { uid: timestamp_ms }
+
   daysLeft: number | null;
   tenderStatus: string;
   sourceUrl: string | null;
@@ -99,6 +106,48 @@ export async function getTenders(): Promise<Tender[]> {
       if (title.length < 10) return false;
       return !JUNK_TITLE_PATTERNS.some((p) => p.test(title));
     });
+}
+
+export async function markAsRead(tenderId: string, uid: string) {
+  await updateDoc(doc(db, "tenders", tenderId), {
+    [`readBy.${uid}`]: Date.now(),
+  });
+}
+
+export async function toggleRead(tenderId: string, uid: string, isRead: boolean) {
+  if (isRead) {
+    await updateDoc(doc(db, "tenders", tenderId), {
+      [`readBy.${uid}`]: Date.now(),
+    });
+  } else {
+    // Remove the uid from readBy — set to deleteField equivalent by setting null
+    await updateDoc(doc(db, "tenders", tenderId), {
+      [`readBy.${uid}`]: null,
+    });
+  }
+}
+
+export async function createTender(data: Partial<Tender>): Promise<string> {
+  // Sanitise NIT for doc ID
+  const nitNumber = (data.nitNumber || `MANUAL-${Date.now()}`)
+    .trim()
+    .replace(/[\s/\\.]+/g, "-")
+    .replace(/-+/g, "-")
+    .toUpperCase();
+
+  const tender = {
+    ...data,
+    nitNumber,
+    sources: ["Manual"],
+    flags: {},
+    notes: {},
+    readBy: {},
+    firstSeenAt: Timestamp.now(),
+    lastUpdatedAt: Timestamp.now(),
+  };
+
+  await setDoc(doc(db, "tenders", nitNumber), tender);
+  return nitNumber;
 }
 
 export interface EditHistoryEntry {

@@ -222,6 +222,8 @@ function TenderDetailContent() {
       biddingStructure: t.biddingStructure || "",
       bespaSigning: t.bespaSigning || "",
       assignedTo: t.assignedTo || "",
+      awardedTo: t.awardedTo || "",
+      developedBy: t.developedBy || "",
       summary: t.summary || "",
       contactPerson: t.contactPerson || "",
       contactEmail: t.contactEmail || "",
@@ -322,6 +324,8 @@ function TenderDetailContent() {
       totalCost: parseNum(form.totalCost),
       sourceUrl: form.sourceUrl || null,
       assignedTo: form.assignedTo || null,
+      awardedTo: form.awardedTo || null,
+      developedBy: form.developedBy || null,
       summary: form.summary || null,
       contactPerson: form.contactPerson || null,
       contactEmail: form.contactEmail || null,
@@ -464,6 +468,8 @@ function TenderDetailContent() {
                   <EditText label="Bidding Structure" value={f("biddingStructure")} onChange={sf("biddingStructure")} />
                   <EditText label="BESPA Signing" value={f("bespaSigning")} onChange={sf("bespaSigning")} />
                   <EditSelect label="Assigned To" value={f("assignedTo")} onChange={sf("assignedTo")} options={INGRO_TEAM} />
+                  <EditText label="Awarded To" value={f("awardedTo")} onChange={sf("awardedTo")} placeholder="Company that won the bid" />
+                  <EditText label="Developed By" value={f("developedBy")} onChange={sf("developedBy")} placeholder="Company that develops/executes" />
                 </>
               ) : (
                 <>
@@ -480,6 +486,8 @@ function TenderDetailContent() {
                   <Row label="Assigned To" value={t.assignedTo ? (
                     <span className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full text-xs font-medium">{t.assignedTo}</span>
                   ) : null} />
+                  {t.awardedTo && <Row label="Awarded To" value={<span className="text-green-700 font-medium">{t.awardedTo}</span>} />}
+                  {t.developedBy && <Row label="Developed By" value={<span className="text-blue-700 font-medium">{t.developedBy}</span>} />}
                 </>
               )}
             </Section>
