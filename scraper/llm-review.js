@@ -94,7 +94,7 @@ async function main() {
       !t.category ||
       !t.state ||
       !t.tenderMode ||
-      (doPdf && t.documentLink && t.documentLink.includes(".pdf") && !t.minimumBidSize)
+      (doPdf && t.documentLink && !t.minimumBidSize)
     );
   });
 
@@ -159,7 +159,6 @@ async function main() {
     if (
       doPdf &&
       tender.documentLink &&
-      tender.documentLink.toLowerCase().includes(".pdf") &&
       !tender.minimumBidSize
     ) {
       console.log(`\n${YELLOW}From PDF:${RESET} ${tender.documentLink.slice(0, 80)}`);

@@ -59,17 +59,31 @@ async function downloadAndExtract(pdfUrl) {
  * Enrich a tender with fields extracted from its bid document PDF.
  * Returns the updates object (only fields that were extracted).
  */
+/**
+ * Check if a URL likely serves a downloadable document (PDF/DOC).
+ */
+function isDocumentUrl(url) {
+  if (!url) return false;
+  const lower = url.toLowerCase();
+  // Direct file extensions
+  if (lower.match(/\.(pdf|doc|docx|xlsx?)(\?|$)/)) return true;
+  // Known download URL patterns (GeM, SECI, NTPC etc.)
+  if (lower.includes("showbiddocument")) return true;
+  if (lower.includes("/uploads/tender")) return true;
+  if (lower.includes("/writereaddata/tender")) return true;
+  if (lower.includes("download") && !lower.includes("tenderdetail.com")) return true;
+  return false;
+}
+
 export async function enrichFromPdf(tender) {
-  // Collect all PDF URLs from documents array + documentLink
+  // Collect all document URLs from documents array + documentLink
   const pdfUrls = new Set();
   if (tender.documents && Array.isArray(tender.documents)) {
     for (const d of tender.documents) {
-      if (d.url && d.url.toLowerCase().includes(".pdf")) {
-        pdfUrls.add(d.url);
-      }
+      if (isDocumentUrl(d.url)) pdfUrls.add(d.url);
     }
   }
-  if (tender.documentLink && tender.documentLink.toLowerCase().includes(".pdf")) {
+  if (isDocumentUrl(tender.documentLink)) {
     pdfUrls.add(tender.documentLink);
   }
 
