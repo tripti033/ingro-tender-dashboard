@@ -359,7 +359,7 @@ function TenderDetailContent() {
     if (!user || !tender) return;
     const newFlag = flag === selectedFlag ? "" : flag;
     setSelectedFlag(newFlag);
-    try { await updateFlag(tender.nitNumber, user.uid, newFlag); setFlagSaved(true); setTimeout(() => setFlagSaved(false), 2000); } catch { /* */ }
+    try { await updateFlag(tender.nitNumber, user.uid, newFlag, user.email || "", tender.title || ""); setFlagSaved(true); setTimeout(() => setFlagSaved(false), 2000); } catch { /* */ }
   };
 
   const handleSaveNote = async () => {

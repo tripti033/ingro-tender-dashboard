@@ -153,7 +153,7 @@ function DashboardContent() {
     if (!user) return;
     const flag = e.target.value;
     try {
-      await updateFlag(tender.nitNumber, user.uid, flag);
+      await updateFlag(tender.nitNumber, user.uid, flag, user.email || "", tender.title || "");
       setTenders((prev) => prev.map((t) =>
         t.nitNumber === tender.nitNumber ? { ...t, flags: { ...t.flags, [user.uid]: flag } } : t
       ));

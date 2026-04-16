@@ -197,6 +197,8 @@ export async function updateTender(
     await addDoc(collection(db, "tenders", tenderId, "editHistory"), {
       editedBy: userEmail, editedByUid: userUid, editedAt: Timestamp.now(), changes,
     });
+    const fieldNames = Object.keys(changes).slice(0, 3).join(", ");
+    addActivity({ type: "edit", userEmail, tenderNit: tenderId, tenderTitle: oldTender.title || null, description: `edited ${fieldNames}${Object.keys(changes).length > 3 ? ` +${Object.keys(changes).length - 3} more` : ""}` });
   }
 }
 
@@ -206,12 +208,40 @@ export async function getEditHistory(tenderId: string, max = 20): Promise<EditHi
   return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as EditHistoryEntry);
 }
 
-export async function updateFlag(tenderId: string, uid: string, flag: string) {
+export async function updateFlag(tenderId: string, uid: string, flag: string, userEmail?: string, tenderTitle?: string) {
   await updateDoc(doc(db, "tenders", tenderId), { [`flags.${uid}`]: flag, lastUpdatedAt: Timestamp.now() });
+  if (userEmail && flag && flag !== "\u2014") {
+    addActivity({ type: "flag", userEmail, tenderNit: tenderId, tenderTitle: tenderTitle || null, description: `flagged as "${flag}"` });
+  }
 }
 
 export async function updateNote(tenderId: string, uid: string, note: string) {
   await updateDoc(doc(db, "tenders", tenderId), { [`notes.${uid}`]: note, lastUpdatedAt: Timestamp.now() });
+}
+
+// ── Activity Feed ──
+
+export interface Activity {
+  id: string;
+  type: "flag" | "edit" | "note" | "status" | "assign" | "create" | "scrape";
+  userEmail: string;
+  tenderNit: string | null;
+  tenderTitle: string | null;
+  description: string;
+  createdAt: Timestamp;
+}
+
+export async function addActivity(data: Omit<Activity, "id" | "createdAt">) {
+  await addDoc(collection(db, "activity"), {
+    ...data,
+    createdAt: Timestamp.now(),
+  });
+}
+
+export async function getActivities(max = 50): Promise<Activity[]> {
+  const q = query(collection(db, "activity"), orderBy("createdAt", "desc"), limit(max));
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Activity);
 }
 
 // ── Alerts ──
