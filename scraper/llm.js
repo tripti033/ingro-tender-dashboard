@@ -10,12 +10,13 @@
 
 const OLLAMA_URL = process.env.OLLAMA_URL || "http://localhost:11434";
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "llama3.2:3b";
-const LLM_TIMEOUT_MS = 30000;
+const LLM_TIMEOUT_MS = 90000; // 90s — generous for cold model load
 
 let llmAvailable = null; // cached availability check
 
 /**
  * Check if Ollama is running and the model is available.
+ * On first check, sends a warm-up prompt to pre-load the model into RAM.
  * Returns true/false, cached after first call.
  */
 export async function isLlmAvailable() {
@@ -23,7 +24,7 @@ export async function isLlmAvailable() {
 
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 3000);
+    const timeout = setTimeout(() => controller.abort(), 5000);
     const resp = await fetch(`${OLLAMA_URL}/api/tags`, {
       signal: controller.signal,
     });
@@ -44,7 +45,29 @@ export async function isLlmAvailable() {
       return false;
     }
 
-    console.log(`[LLM] Ollama available with model ${OLLAMA_MODEL}`);
+    // Warm up — first call loads model into RAM (~10-30s on M2)
+    console.log(`[LLM] Warming up model ${OLLAMA_MODEL}...`);
+    try {
+      const warmResp = await fetch(`${OLLAMA_URL}/api/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: OLLAMA_MODEL,
+          prompt: "Say hi",
+          stream: false,
+          options: { num_predict: 5 },
+        }),
+        signal: AbortSignal.timeout(60000),
+      });
+      if (warmResp.ok) {
+        console.log(`[LLM] Model loaded and ready`);
+      }
+    } catch {
+      console.log("[LLM] Warm-up timed out — skipping LLM this run");
+      llmAvailable = false;
+      return false;
+    }
+
     llmAvailable = true;
     return true;
   } catch {
