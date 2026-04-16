@@ -24,18 +24,17 @@ const USER_AGENT =
  * Uses pdf-parse if installed; otherwise returns null with a warning.
  */
 async function downloadAndExtract(pdfUrl) {
-  let pdfParse;
+  let PDFParseClass;
   try {
     const mod = await import("pdf-parse");
-    pdfParse = mod.default || mod;
+    PDFParseClass = mod.PDFParse;
   } catch {
-    console.log(
-      "[PDF] pdf-parse not installed. Run: npm install pdf-parse"
-    );
+    console.log("[PDF] pdf-parse not installed. Run: npm install pdf-parse");
     return null;
   }
 
   try {
+    console.log(`[PDF] Downloading ${pdfUrl.slice(0, 80)}...`);
     const resp = await axios.get(pdfUrl, {
       headers: { "User-Agent": USER_AGENT },
       responseType: "arraybuffer",
@@ -44,8 +43,12 @@ async function downloadAndExtract(pdfUrl) {
     });
 
     const buffer = Buffer.from(resp.data);
-    const data = await pdfParse(buffer);
-    return data.text || null;
+    const parser = new PDFParseClass({ data: buffer });
+    await parser.load();
+    const result = await parser.getText();
+    parser.destroy();
+    console.log(`[PDF] Extracted ${result.text?.length || 0} chars from ${result.total} pages`);
+    return result.text || null;
   } catch (err) {
     console.log(`[PDF] Download/parse failed for ${pdfUrl}: ${err.message}`);
     return null;
