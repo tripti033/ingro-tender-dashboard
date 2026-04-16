@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { getTenders, type Tender } from "@/lib/firestore";
 import AuthGuard from "@/components/AuthGuard";
 import Sidebar from "@/components/Sidebar";
@@ -19,11 +19,18 @@ function AuthoritiesContent() {
   const [tenders, setTenders] = useState<Tender[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [expanded, setExpanded] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  const expandParam = searchParams.get("expand");
+  const [expanded, setExpanded] = useState<string | null>(expandParam);
 
   useEffect(() => {
     getTenders().then(setTenders).finally(() => setLoading(false));
   }, []);
+
+  // Auto-expand from URL param
+  useEffect(() => {
+    if (expandParam) setExpanded(expandParam);
+  }, [expandParam]);
 
   const authorities = useMemo(() => {
     const groups: Record<string, AuthorityGroup> = {};

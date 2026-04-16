@@ -473,7 +473,10 @@ function TenderDetailContent() {
                 </>
               ) : (
                 <>
-                  <Row label="Authority" value={t.authority} />
+                  <Row label="Authority" value={t.authority ? (
+                    <button onClick={() => router.push(`/authorities?expand=${encodeURIComponent(t.authority!)}`)}
+                      className="text-[#0D1F3C] hover:underline font-medium">{t.authority}</button>
+                  ) : null} />
                   <Row label="Category" value={t.category} />
                   <Row label="Tender Mode" value={t.tenderMode} />
                   <Row label="Location" value={t.location} />
