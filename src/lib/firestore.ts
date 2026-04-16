@@ -61,6 +61,9 @@ export interface Tender {
   totalCost: number | null;
   documents: { name: string; url: string; uploadDate: string | null }[] | null;
 
+  // LLM Summary — covers info not in structured fields
+  summary: string | null;
+
   // Contact Info (from PDF extraction)
   contactPerson: string | null;
   contactEmail: string | null;

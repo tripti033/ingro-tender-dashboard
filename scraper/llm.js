@@ -267,3 +267,67 @@ ${text}`;
 
   return flat;
 }
+
+/**
+ * Generate a summary paragraph covering important tender info NOT in structured fields.
+ * Covers: eligibility criteria, technical specs (battery chemistry, cycle life, warranty),
+ * penalty clauses, land/grid requirements, commercial terms, special conditions.
+ */
+export async function generateTenderSummary(pdfText, tenderTitle = "") {
+  // Extract diverse sections from the full text
+  const keyPhrases = [
+    "eligibility", "qualification", "experience", "net worth",
+    "battery chemistry", "lithium", "cycle life", "warranty", "degradation",
+    "penalty", "liquidated damages", "delay",
+    "land", "site", "right of way",
+    "grid connectivity", "transmission", "evacuation",
+    "insurance", "force majeure",
+    "payment", "tariff", "escalation",
+    "scope of work", "deliverables",
+    "minimum", "maximum", "shall not", "must",
+  ];
+
+  const chunks = new Set();
+  const textLower = pdfText.toLowerCase();
+  for (const phrase of keyPhrases) {
+    let idx = 0;
+    while ((idx = textLower.indexOf(phrase, idx)) !== -1) {
+      const start = Math.max(0, idx - 150);
+      const end = Math.min(pdfText.length, idx + 350);
+      chunks.add(pdfText.slice(start, end));
+      idx += phrase.length;
+      if (chunks.size >= 25) break;
+    }
+    if (chunks.size >= 25) break;
+  }
+
+  const text = [...Array.from(chunks)].join("\n---\n").slice(0, 8000);
+
+  if (text.length < 200) return null;
+
+  const systemPrompt = `You are an expert analyst for Indian BESS (Battery Energy Storage System) tenders. Write concise, factual summaries.`;
+
+  const prompt = `Read these excerpts from a BESS tender document titled "${tenderTitle}".
+
+Write a 3-5 sentence summary covering ONLY the important details that are NOT typically captured in structured fields (like MW, MWh, EMD, dates, fees).
+
+Focus on:
+- Eligibility requirements (min experience, net worth, turnover)
+- Battery technology requirements (chemistry type, cycle life, warranty period, degradation limits)
+- Penalty/LD clauses
+- Land and grid connectivity requirements
+- Special conditions or unique terms
+- Key commercial terms
+
+If the text doesn't have meaningful info beyond basic tender details, respond with just: {"summary": null}
+
+Respond with JSON: {"summary": "your summary text here"}
+
+Text excerpts:
+${text}`;
+
+  const result = await callLlm(prompt, systemPrompt);
+  if (!result || !result.summary) return null;
+
+  return typeof result.summary === "string" ? result.summary : null;
+}

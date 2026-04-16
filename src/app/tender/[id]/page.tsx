@@ -222,6 +222,7 @@ function TenderDetailContent() {
       biddingStructure: t.biddingStructure || "",
       bespaSigning: t.bespaSigning || "",
       assignedTo: t.assignedTo || "",
+      summary: t.summary || "",
       contactPerson: t.contactPerson || "",
       contactEmail: t.contactEmail || "",
       contactPhone: t.contactPhone || "",
@@ -321,6 +322,7 @@ function TenderDetailContent() {
       totalCost: parseNum(form.totalCost),
       sourceUrl: form.sourceUrl || null,
       assignedTo: form.assignedTo || null,
+      summary: form.summary || null,
       contactPerson: form.contactPerson || null,
       contactEmail: form.contactEmail || null,
       contactPhone: form.contactPhone || null,
@@ -430,6 +432,20 @@ function TenderDetailContent() {
           </div>
           )}
         </div>
+
+        {/* Summary — AI-generated overview of key tender info */}
+        {(t.summary || editing) && (
+          <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-5">
+            <h2 className="text-xs font-semibold text-blue-600 uppercase tracking-wider mb-2">AI Summary</h2>
+            {editing ? (
+              <textarea value={form.summary || ""} onChange={(e) => setForm((p) => ({ ...p, summary: e.target.value }))}
+                rows={4} className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 resize-none"
+                placeholder="LLM-generated summary of key tender details (eligibility, battery specs, penalties, special conditions)..." />
+            ) : (
+              <p className="text-sm text-gray-700 leading-relaxed">{t.summary}</p>
+            )}
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Column 1 — Basic + Dates */}

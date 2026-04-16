@@ -14,7 +14,7 @@ import axios from "axios";
 import { initializeApp } from "firebase/app";
 import { getFirestore, collection, getDocs, doc, updateDoc, Timestamp } from "firebase/firestore";
 import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
-import { extractPdfFields, isLlmAvailable } from "./llm.js";
+import { extractPdfFields, generateTenderSummary, isLlmAvailable } from "./llm.js";
 
 const USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36";
@@ -136,6 +136,13 @@ export async function enrichFromPdf(tender) {
 
   if (fields.vgfAmount && fields.vgfAmount > 0) updates.vgfEligible = true;
   if (fields.emdAmount && fields.emdAmount > 0 && !tender.emdUnit) updates.emdUnit = "INR";
+
+  // Generate summary if tender doesn't have one
+  if (!tender.summary) {
+    console.log(`[PDF] Generating summary...`);
+    const summary = await generateTenderSummary(combinedText, tender.title);
+    if (summary) updates.summary = summary;
+  }
 
   return updates;
 }
