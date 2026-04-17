@@ -269,6 +269,35 @@ ${text}`;
 }
 
 /**
+ * Extract tender result info from news article text.
+ * Returns: { winners[], bidders[], developer, lowestPrice, priceUnit, awardedCapacityMWh, state }
+ */
+export async function extractTenderResult(newsText, tenderTitle = "") {
+  const text = newsText.slice(0, 8000);
+
+  const prompt = `Read this news article about an Indian BESS (Battery Energy Storage System) tender result.
+Tender: "${tenderTitle}"
+
+Extract a FLAT JSON with:
+- winners: array of objects [{company: string, capacityMWh: number or null, priceLakhsPerMW: number or null, priceRsPerKWh: number or null}]
+- bidders: array of strings (all companies that bid, including losers)
+- developer: string or null (company that will execute/build the project, if different from winner)
+- totalCapacityMWh: number or null
+- state: string or null
+- tenderAuthority: string or null (SECI, NTPC, GUVNL etc.)
+- resultSummary: string (1-2 sentence summary of the result)
+
+Return null for any field not found in the text.
+
+Article text:
+${text}`;
+
+  const result = await callLlm(prompt, "You are an expert analyst for Indian BESS tenders. Extract structured data from news articles about tender results. Respond ONLY with valid JSON.");
+  if (!result) return null;
+  return result;
+}
+
+/**
  * Process an industry alert with LLM: score, categorize, extract entities, detect if tender.
  * Returns: { relevanceScore, category, entities, isTenderAnnouncement, draftTender }
  */
