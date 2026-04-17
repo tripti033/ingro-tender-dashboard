@@ -33,7 +33,29 @@ const NEWS_SEARCH_URLS = [
   (q) => `https://mercomindia.com/?s=${encodeURIComponent(q)}`,
   (q) => `https://www.saurenergy.com/?s=${encodeURIComponent(q)}`,
   (q) => `https://www.pv-magazine-india.com/?s=${encodeURIComponent(q)}`,
+  // Google News RSS — broadest coverage
+  (q) => `https://news.google.com/rss/search?q=${encodeURIComponent(q + " India")}&hl=en-IN&gl=IN`,
 ];
+
+// Known authority names to detect from tender title/NIT
+const KNOWN_AUTHORITIES = [
+  "SECI", "NTPC", "NGEL", "NUGEL", "GUVNL", "MSEDCL", "RRVUNL", "PSPCL",
+  "TNGECL", "SJVNL", "DHBVN", "WBSEDCL", "MSETCL", "UPCL", "UJVNL",
+  "NHPC", "PGCIL", "POWERGRID", "IREDA", "HPPCL", "NVVN", "KPTCL",
+  "TSECL", "RVPN", "APTRANSCO", "CESC", "CSPDCL", "UPPCL", "WBGEDCL",
+  "KREDL", "HPCL", "AEML", "TGTRANSCO",
+];
+
+/**
+ * Extract a real authority name from the tender title/NIT.
+ */
+function detectAuthority(tender) {
+  const text = `${tender.nitNumber || ""} ${tender.title || ""} ${tender.authority || ""}`.toUpperCase();
+  for (const auth of KNOWN_AUTHORITIES) {
+    if (text.includes(auth)) return auth;
+  }
+  return null;
+}
 
 // Firebase init
 const app = initializeApp({
@@ -63,26 +85,41 @@ async function searchNews(query) {
         timeout: 15000,
       });
 
-      const $ = cheerio.load(resp.data);
+      const $ = cheerio.load(resp.data, { xmlMode: url.includes("rss") });
 
-      // Extract article titles and links from search results
-      $("article, .post, .entry, .search-result, h2 a, h3 a").each((_i, el) => {
-        const linkEl = $(el).is("a") ? $(el) : $(el).find("a").first();
-        const title = linkEl.text().trim() || $(el).find("h2, h3, .title").text().trim();
-        const link = linkEl.attr("href");
+      if (url.includes("rss") || url.includes("news.google")) {
+        // Google News RSS format
+        $("item").each((_i, el) => {
+          const title = $(el).find("title").text().trim();
+          const link = $(el).find("link").text().trim();
+          if (!title || title.length < 15 || !link) return;
 
-        if (!title || title.length < 20 || !link) return;
+          const titleLower = title.toLowerCase();
+          const isResult = ["award", "won", "winner", "result", "select", "lowest", "l1", "bid price", "bags", "secures"].some(
+            (kw) => titleLower.includes(kw)
+          );
+          if (isResult) {
+            articles.push({ title, link, source: "Google News" });
+          }
+        });
+      } else {
+        // HTML search results (Mercom, SaurEnergy, PV Magazine)
+        $("article, .post, .entry, .search-result, h2 a, h3 a").each((_i, el) => {
+          const linkEl = $(el).is("a") ? $(el) : $(el).find("a").first();
+          const title = linkEl.text().trim() || $(el).find("h2, h3, .title").text().trim();
+          const link = linkEl.attr("href");
 
-        // Check if the article is about tender results/awards
-        const titleLower = title.toLowerCase();
-        const isResult = ["award", "won", "winner", "result", "select", "lowest", "l1", "bid price"].some(
-          (kw) => titleLower.includes(kw)
-        );
+          if (!title || title.length < 20 || !link) return;
 
-        if (isResult) {
-          articles.push({ title, link, source: url.split("/")[2] });
-        }
-      });
+          const titleLower = title.toLowerCase();
+          const isResult = ["award", "won", "winner", "result", "select", "lowest", "l1", "bid price", "bags", "secures"].some(
+            (kw) => titleLower.includes(kw)
+          );
+          if (isResult) {
+            articles.push({ title, link, source: url.split("/")[2] });
+          }
+        });
+      }
     } catch {
       // Skip failed searches
     }
@@ -161,19 +198,35 @@ async function main() {
     console.log(`${(tender.title || "").slice(0, 80)}`);
     console.log(`Authority: ${tender.authority || "?"} | ${tender.powerMW || "?"}MW / ${tender.energyMWh || "?"}MWh`);
 
-    // Build search queries
+    // Detect real authority name from title/NIT (not generic TenderDetail labels)
+    const realAuthority = detectAuthority(tender);
+
+    // Build search queries — use real authority, MW, and title keywords
     const queries = [];
-    if (tender.authority && tender.powerMW) {
-      queries.push(`${tender.authority} ${tender.powerMW}MW BESS tender result`);
-      queries.push(`${tender.authority} ${tender.powerMW}MW battery storage winner`);
+
+    if (realAuthority && tender.powerMW) {
+      queries.push(`${realAuthority} ${tender.powerMW}MW BESS tender result winner`);
+      queries.push(`${realAuthority} ${tender.energyMWh || ""}MWh battery storage awarded`);
+    } else if (realAuthority) {
+      queries.push(`${realAuthority} BESS tender result`);
     }
-    if (tender.nitNumber && !tender.nitNumber.startsWith("TDR-")) {
-      queries.push(`${tender.nitNumber} tender result`);
+
+    if (tender.powerMW && tender.energyMWh) {
+      queries.push(`${tender.powerMW}MW ${tender.energyMWh}MWh BESS tender result India`);
     }
+
+    if (tender.state && tender.powerMW) {
+      queries.push(`${tender.state} ${tender.powerMW}MW BESS tender winner`);
+    }
+
     if (tender.title) {
-      // Use first key words from title
-      const words = tender.title.split(/\s+/).slice(0, 6).join(" ");
-      queries.push(`${words} tender result winner`);
+      // Extract meaningful keywords from title (skip generic words)
+      const meaningful = tender.title
+        .replace(/tender|for|the|of|and|in|at|by|with|from|setting|up|implementation/gi, "")
+        .replace(/\s+/g, " ").trim().split(" ").slice(0, 5).join(" ");
+      if (meaningful.length > 10) {
+        queries.push(`${meaningful} tender result awarded`);
+      }
     }
 
     if (queries.length === 0) {
