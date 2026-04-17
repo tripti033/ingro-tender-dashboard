@@ -1,13 +1,8 @@
 /**
  * Tender Result Tracker — finds who won closed tenders.
  *
- * Pipeline:
- * 1. Find tenders where daysLeft < 0, no awardedTo, AND has a real authority name
- * 2. Search Google News RSS + Mercom for result articles
- * 3. Follow Google News redirects to get real article URLs
- * 4. LLM extracts: winner, price, bidders, developer
- * 5. Validates result matches the tender before writing
- * 6. Updates tender + creates Bid records
+ * Uses DuckDuckGo HTML search to find news articles about tender results,
+ * then LLM extracts winners, prices, bidders from the article text.
  *
  * Usage:
  *   node scraper/result-tracker.js           # All closed tenders
@@ -26,7 +21,6 @@ import { extractTenderResult, isLlmAvailable } from "./llm.js";
 const USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36";
 
-// Known authority names to detect from tender title/NIT
 const KNOWN_AUTHORITIES = [
   "SECI", "NTPC", "NGEL", "NUGEL", "GUVNL", "MSEDCL", "RRVUNL", "PSPCL",
   "TNGECL", "SJVNL", "DHBVN", "WBSEDCL", "MSETCL", "UPCL", "UJVNL",
@@ -54,85 +48,36 @@ await signInWithEmailAndPassword(authFb, process.env.FIREBASE_SCRAPER_EMAIL, pro
 const db = getFirestore(app);
 
 /**
- * Generic search on a news site — extracts article titles + links.
+ * Search DuckDuckGo HTML (no JS needed, no redirects, direct article URLs).
+ * Restricts to energy news sites for accuracy.
  */
-async function searchSite(url, sourceName) {
+async function searchDuckDuckGo(query) {
   const articles = [];
   try {
-    const resp = await axios.get(url, { headers: { "User-Agent": USER_AGENT }, timeout: 15000 });
-    const $ = cheerio.load(resp.data);
-    $("article h2 a, .entry-title a, h3 a, h2 a").each((_i, el) => {
-      const title = $(el).text().trim();
-      const link = $(el).attr("href");
-      if (!title || title.length < 20 || !link) return;
-      const titleLower = title.toLowerCase();
-      if (["award", "won", "winner", "result", "select", "lowest", "l1", "bags", "secures", "announces"].some(kw => titleLower.includes(kw))) {
-        articles.push({ title, link, source: sourceName });
-      }
+    const siteFilter = "site:mercomindia.com OR site:saurenergy.com OR site:pv-magazine-india.com OR site:solarquarter.com";
+    const fullQuery = `${query} ${siteFilter}`;
+    const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(fullQuery)}`;
+
+    const resp = await axios.get(url, {
+      headers: { "User-Agent": USER_AGENT },
+      timeout: 15000,
     });
-  } catch { /* skip */ }
-  return articles;
-}
-
-/**
- * Search Google News RSS — but instead of using the redirect link,
- * construct the real URL by searching the source site directly.
- * Returns articles with title + source name (no direct link — we search the source site).
- */
-async function searchGoogleNewsWithSources(query) {
-  const articles = [];
-  try {
-    const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query + " India")}&hl=en-IN&gl=IN`;
-    const resp = await axios.get(url, { headers: { "User-Agent": USER_AGENT }, timeout: 15000 });
-    const $ = cheerio.load(resp.data, { xmlMode: true });
-
-    $("item").each((_i, el) => {
-      const title = $(el).find("title").text().trim();
-      const sourceName = $(el).find("source").text().trim();
-      const sourceUrl = $(el).find("source").attr("url") || "";
-
-      if (!title || title.length < 15) return;
-      const titleLower = title.toLowerCase();
-      if (["award", "won", "winner", "result", "select", "lowest", "l1", "bags", "secures", "announces"].some(kw => titleLower.includes(kw))) {
-        // Use the source site's search to find the article
-        // Construct a search URL for the source site
-        let link = null;
-        if (sourceUrl.includes("mercomindia")) link = `https://mercomindia.com/?s=${encodeURIComponent(title.slice(0, 40))}`;
-        else if (sourceUrl.includes("saurenergy")) link = `https://www.saurenergy.com/?s=${encodeURIComponent(title.slice(0, 40))}`;
-        else if (sourceUrl.includes("pv-magazine")) link = `https://www.pv-magazine-india.com/?s=${encodeURIComponent(title.slice(0, 40))}`;
-        else if (sourceUrl.includes("solarquarter")) link = `https://solarquarter.com/?s=${encodeURIComponent(title.slice(0, 40))}`;
-        // For known sources, search their site directly
-        if (link) {
-          articles.push({ title, link, source: sourceName, isSearchUrl: true });
-        }
-      }
-    });
-  } catch { /* skip */ }
-  return articles;
-}
-
-// Keep old function name for compatibility but unused now
-/**
- * Search Mercom India for tender result articles.
- */
-async function searchMercom(query) {
-  const articles = [];
-  try {
-    const url = `https://mercomindia.com/?s=${encodeURIComponent(query)}`;
-    const resp = await axios.get(url, { headers: { "User-Agent": USER_AGENT }, timeout: 15000 });
     const $ = cheerio.load(resp.data);
 
-    $("article h2 a, .entry-title a, h3 a").each((_i, el) => {
+    $(".result__a").each((_i, el) => {
       const title = $(el).text().trim();
-      const link = $(el).attr("href");
-      if (!title || title.length < 20 || !link) return;
+      const href = $(el).attr("href") || "";
+      const match = href.match(/uddg=([^&]+)/);
+      const realUrl = match ? decodeURIComponent(match[1]) : href;
+
+      if (!title || title.length < 15 || !realUrl.startsWith("http")) return;
 
       const titleLower = title.toLowerCase();
       const isResult = ["award", "won", "winner", "result", "select", "lowest", "l1", "bags", "secures", "announces"].some(
         (kw) => titleLower.includes(kw)
       );
       if (isResult) {
-        articles.push({ title, link, source: "Mercom" });
+        articles.push({ title, link: realUrl, source: "DuckDuckGo" });
       }
     });
   } catch { /* skip */ }
@@ -166,12 +111,10 @@ async function main() {
   const allTenders = snap.docs.map((d) => ({ nitNumber: d.id, ...d.data() }));
   const targetNit = process.argv[2];
 
-  // Find closed tenders without results — ONLY those with a real authority
   const candidates = allTenders.filter((t) => {
     if (targetNit) return t.nitNumber === targetNit;
     if (t.awardedTo) return false;
     if (t.tenderStatus !== "closed" && !(t.daysLeft != null && t.daysLeft < 0)) return false;
-    // Must have a real authority name (skip generic TenderDetail labels)
     return !!detectAuthority(t);
   });
 
@@ -197,119 +140,60 @@ async function main() {
 
     console.log(`  Query: "${query}"`);
 
-    // Search multiple news sites directly (not Google News — redirects don't resolve)
-    const mercomQuery = `${realAuthority} ${tender.powerMW || ""} BESS result`;
-    const mercomArticles = await searchMercom(mercomQuery);
-    const saurArticles = await searchSite(
-      `https://www.saurenergy.com/?s=${encodeURIComponent(mercomQuery)}`,
-      "SaurEnergy"
-    );
-    const pvMagArticles = await searchSite(
-      `https://www.pv-magazine-india.com/?s=${encodeURIComponent(mercomQuery)}`,
-      "PV Magazine"
-    );
+    // Search DuckDuckGo
+    const articles = await searchDuckDuckGo(query);
 
-    // Also search Google News but extract source URLs from RSS metadata
-    const googleArticles = await searchGoogleNewsWithSources(query);
-
-    // Filter by relevance — article title must mention the authority
+    // Filter by relevance — must mention authority
     const authLower = realAuthority.toLowerCase();
-    const mwStr = tender.powerMW ? String(tender.powerMW) : null;
+    const relevant = articles.filter((a) => a.title.toLowerCase().includes(authLower));
 
-    const allArticles = [...mercomArticles, ...saurArticles, ...pvMagArticles, ...googleArticles].filter((a) => {
-      const titleLower = a.title.toLowerCase();
-      return titleLower.includes(authLower) || (mwStr && titleLower.includes(mwStr));
-    });
-
-    // Deduplicate by title (first 50 chars)
-    const seen = new Set();
-    const uniqueArticles = allArticles.filter((a) => {
-      const key = a.title.toLowerCase().slice(0, 50);
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-
-    if (uniqueArticles.length === 0) {
-      console.log(`  → No relevant articles found, skipping`);
+    if (relevant.length === 0) {
+      console.log(`  → No relevant articles found`);
+      await new Promise((r) => setTimeout(r, 2000));
       continue;
     }
 
-    console.log(`  Found ${uniqueArticles.length} relevant article(s):`);
-    uniqueArticles.slice(0, 5).forEach((a) => console.log(`    - ${a.title.slice(0, 70)} [${a.source}]`));
+    console.log(`  Found ${relevant.length} article(s):`);
+    relevant.slice(0, 3).forEach((a) => console.log(`    - ${a.title.slice(0, 70)}`));
 
-    // Try each article until we get a valid result
+    // Try each article
     let result = null;
+    let usedUrl = null;
 
-    for (const article of uniqueArticles.slice(0, 3)) {
-      let articleUrl = article.link;
-
-      // If this is a search URL from Google News source matching, resolve the actual article
-      if (article.isSearchUrl) {
-        console.log(`  Searching source: ${articleUrl?.slice(0, 60)}`);
-        try {
-          const resp = await axios.get(articleUrl, { headers: { "User-Agent": USER_AGENT }, timeout: 15000 });
-          const $s = cheerio.load(resp.data);
-          // Get first article link from search results
-          const firstLink = $s("article a, .entry-title a, h2 a, h3 a").first().attr("href");
-          if (firstLink && !firstLink.includes("?s=")) {
-            articleUrl = firstLink;
-          } else {
-            console.log("  → Couldn't find article in search results, trying next");
-            continue;
-          }
-        } catch {
-          console.log("  → Search failed, trying next");
-          continue;
-        }
-      }
-
-      if (!articleUrl) {
-        console.log("  → No URL, trying next");
-        continue;
-      }
-
-      console.log(`  Fetching: ${articleUrl.slice(0, 70)}`);
-      const text = await fetchArticleText(articleUrl);
+    for (const article of relevant.slice(0, 3)) {
+      console.log(`  Fetching: ${article.link.slice(0, 70)}`);
+      const text = await fetchArticleText(article.link);
 
       if (!text || text.length < 300) {
-        console.log(`  → Article too short (${text?.length || 0} chars), trying next`);
+        console.log(`  → Too short (${text?.length || 0} chars), next`);
         continue;
       }
 
-      console.log(`  Article: ${text.length} chars. Asking LLM...`);
+      console.log(`  ${text.length} chars. Asking LLM...`);
       const llmResult = await extractTenderResult(text, tender.title || "");
 
-      if (!llmResult || !llmResult.winners || !Array.isArray(llmResult.winners) || llmResult.winners.length === 0) {
-        console.log("  → No winners extracted, trying next");
-        continue;
-      }
-
-      const winner = llmResult.winners[0]?.company;
-      if (!winner || winner.length < 2) {
-        console.log("  → Empty winner name, trying next");
+      if (!llmResult?.winners?.length || !llmResult.winners[0]?.company) {
+        console.log("  → No winners, next");
         continue;
       }
 
       result = llmResult;
-      result._articleUrl = articleUrl;
+      usedUrl = article.link;
       break;
     }
 
     if (!result) {
       console.log("  → No valid result, skipping");
+      await new Promise((r) => setTimeout(r, 2000));
       continue;
     }
 
     // Display
-    console.log(`  RESULT: ${result.resultSummary || "-"}`);
+    console.log(`  RESULT: ${result.resultSummary || ""}`);
     for (const w of result.winners) {
       console.log(`    Winner: ${w.company} — ${w.capacityMWh || "?"}MWh @ ${w.priceLakhsPerMW || w.priceRsPerKWh || "?"}`);
     }
-
     const bidders = Array.isArray(result.bidders) ? result.bidders : (typeof result.bidders === "string" ? [result.bidders] : []);
-    if (bidders.length > 0) console.log(`    Bidders: ${bidders.join(", ")}`);
-    if (result.developer && result.developer !== "null") console.log(`    Developer: ${result.developer}`);
 
     // Write to Firestore
     const awardedTo = result.winners[0].company;
@@ -319,42 +203,40 @@ async function main() {
       tenderStatus: "awarded",
       lastUpdatedAt: Timestamp.now(),
     });
-    console.log(`  → Tender updated: awarded to ${awardedTo}`);
+    console.log(`  → Updated: awarded to ${awardedTo}`);
     updated++;
 
-    // Create bid records for winners
     for (const w of result.winners) {
       if (!w.company) continue;
-      const companyId = slugify(w.company);
-      await setDoc(doc(db, "companies", companyId), { name: w.company, type: "Developer", bidsWon: 0, bidsLost: 0, totalCapacityMWh: 0, createdAt: Timestamp.now() }, { merge: true });
+      const cid = slugify(w.company);
+      await setDoc(doc(db, "companies", cid), { name: w.company, type: "Developer", bidsWon: 0, bidsLost: 0, totalCapacityMWh: 0, createdAt: Timestamp.now() }, { merge: true });
       await addDoc(collection(db, "bids"), {
-        companyId, companyName: w.company, tenderNit: tender.nitNumber,
-        tenderName: realAuthority || tender.nitNumber, category: tender.category || null,
+        companyId: cid, companyName: w.company, tenderNit: tender.nitNumber,
+        tenderName: realAuthority, category: tender.category || null,
         capacityMWh: w.capacityMWh || null, priceStandalone: w.priceLakhsPerMW || null,
         priceFDRE: w.priceRsPerKWh || null, state: result.state || tender.state || null,
-        result: "won", reference: result._articleUrl,
+        result: "won", reference: usedUrl,
       });
       bidsCreated++;
     }
 
-    // Create bid records for losers
     if (bidders.length > 0) {
       const winnerNames = new Set(result.winners.map((w) => w.company?.toLowerCase()));
       for (const bidder of bidders) {
         if (!bidder || winnerNames.has(bidder.toLowerCase())) continue;
-        const companyId = slugify(bidder);
-        await setDoc(doc(db, "companies", companyId), { name: bidder, type: "Developer", bidsWon: 0, bidsLost: 0, totalCapacityMWh: 0, createdAt: Timestamp.now() }, { merge: true });
+        const cid = slugify(bidder);
+        await setDoc(doc(db, "companies", cid), { name: bidder, type: "Developer", bidsWon: 0, bidsLost: 0, totalCapacityMWh: 0, createdAt: Timestamp.now() }, { merge: true });
         await addDoc(collection(db, "bids"), {
-          companyId, companyName: bidder, tenderNit: tender.nitNumber,
-          tenderName: realAuthority || tender.nitNumber, category: tender.category || null,
+          companyId: cid, companyName: bidder, tenderNit: tender.nitNumber,
+          tenderName: realAuthority, category: tender.category || null,
           capacityMWh: null, priceStandalone: null, priceFDRE: null,
-          state: result.state || tender.state || null, result: "lost", reference: result._articleUrl,
+          state: result.state || tender.state || null, result: "lost", reference: usedUrl,
         });
         bidsCreated++;
       }
     }
 
-    await new Promise((r) => setTimeout(r, 2000));
+    await new Promise((r) => setTimeout(r, 3000)); // rate limit DDG
   }
 
   console.log(`\n${"═".repeat(60)}`);
