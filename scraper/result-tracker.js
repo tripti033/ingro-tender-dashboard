@@ -256,39 +256,82 @@ async function main() {
       continue;
     }
 
-    console.log(`  Found ${allArticles.length} result article(s):`);
-    allArticles.forEach((a) => console.log(`    - ${a.title.slice(0, 70)} [${a.source}]`));
+    // Filter articles: title must mention authority OR MW OR BESS keywords relevant to this tender
+    const tenderKeywords = [
+      realAuthority,
+      tender.powerMW ? `${tender.powerMW}` : null,
+      tender.energyMWh ? `${tender.energyMWh}` : null,
+      tender.state,
+    ].filter(Boolean).map(k => k.toLowerCase());
 
-    // Fetch and process the best article (first one)
-    const article = allArticles[0];
-    console.log(`  Fetching: ${article.link.slice(0, 70)}`);
-    const articleText = await fetchArticleText(article.link);
+    const relevantArticles = allArticles.filter(a => {
+      const titleLower = a.title.toLowerCase();
+      // Article must mention at least one tender-specific keyword
+      return tenderKeywords.some(kw => titleLower.includes(kw)) ||
+        (realAuthority && titleLower.includes(realAuthority.toLowerCase()));
+    });
 
-    if (!articleText || articleText.length < 200) {
-      console.log("  → Article text too short, skipping");
+    if (relevantArticles.length === 0) {
+      console.log(`  Found ${allArticles.length} articles but none match tender keywords, skipping`);
       continue;
     }
 
-    console.log(`  Article: ${articleText.length} chars. Asking LLM...`);
+    console.log(`  Found ${relevantArticles.length} relevant article(s) (of ${allArticles.length}):`);
+    relevantArticles.forEach((a) => console.log(`    - ${a.title.slice(0, 70)} [${a.source}]`));
 
-    const result = await extractTenderResult(articleText, tender.title || "");
-    if (!result) {
-      console.log("  → LLM returned null");
+    // Try each relevant article until we get a valid result
+    let result = null;
+    let usedArticle = null;
+
+    for (const article of relevantArticles.slice(0, 3)) {
+      console.log(`  Fetching: ${article.link.slice(0, 70)}`);
+      const articleText = await fetchArticleText(article.link);
+
+      if (!articleText || articleText.length < 200) {
+        console.log("  → Article text too short, trying next");
+        continue;
+      }
+
+      console.log(`  Article: ${articleText.length} chars. Asking LLM...`);
+      const llmResult = await extractTenderResult(articleText, tender.title || "");
+
+      if (!llmResult || !llmResult.winners || !Array.isArray(llmResult.winners) || llmResult.winners.length === 0) {
+        console.log("  → No winners found in this article, trying next");
+        continue;
+      }
+
+      // Validate: winner company name should NOT be a generic/unrelated company
+      // The article should be about THIS tender, not some random tender
+      const winnerName = llmResult.winners[0]?.company || "";
+      if (!winnerName || winnerName.length < 2) {
+        console.log("  → Empty winner name, trying next");
+        continue;
+      }
+
+      result = llmResult;
+      usedArticle = article;
+      break;
+    }
+
+    if (!result || !usedArticle) {
+      console.log("  → No valid result from any article, skipping");
       continue;
     }
 
     // Display results
     console.log(`  Result summary: ${result.resultSummary || "-"}`);
 
-    if (result.winners && result.winners.length > 0) {
+    if (result.winners && Array.isArray(result.winners)) {
       console.log(`  Winners:`);
       for (const w of result.winners) {
         console.log(`    - ${w.company}: ${w.capacityMWh || "?"}MWh @ ${w.priceLakhsPerMW || w.priceRsPerKWh || "?"}`);
       }
     }
 
-    if (result.bidders && result.bidders.length > 0) {
-      console.log(`  All bidders: ${result.bidders.join(", ")}`);
+    // Fix bidders — ensure it's an array
+    const bidders = Array.isArray(result.bidders) ? result.bidders : (typeof result.bidders === "string" ? [result.bidders] : []);
+    if (bidders.length > 0) {
+      console.log(`  All bidders: ${bidders.join(", ")}`);
     }
 
     if (result.developer) {
@@ -300,12 +343,19 @@ async function main() {
     if (result.winners?.[0]?.company) {
       tenderUpdates.awardedTo = result.winners[0].company;
     }
-    if (result.developer) {
+    if (result.developer && result.developer !== "null") {
       tenderUpdates.developedBy = result.developer;
     }
-    if (result.winners?.length > 0) {
+    if (result.winners?.length > 0 && tenderUpdates.awardedTo) {
       tenderUpdates.tenderStatus = "awarded";
     }
+
+    // Don't write if no real winner identified
+    if (!tenderUpdates.awardedTo) {
+      console.log("  → No clear winner, skipping Firestore update");
+      continue;
+    }
+
     tenderUpdates.lastUpdatedAt = Timestamp.now();
 
     if (Object.keys(tenderUpdates).length > 1) {
@@ -356,9 +406,9 @@ async function main() {
     }
 
     // Create bid records for losers (bidders who didn't win)
-    if (result.bidders && result.winners) {
+    if (bidders.length > 0 && result.winners) {
       const winnerNames = new Set(result.winners.map((w) => w.company?.toLowerCase()));
-      for (const bidder of result.bidders) {
+      for (const bidder of bidders) {
         if (winnerNames.has(bidder.toLowerCase())) continue;
         const companyId = slugify(bidder);
 
