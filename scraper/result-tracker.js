@@ -1,25 +1,25 @@
 /**
- * Tender Result Tracker — finds who won closed tenders.
+ * Tender Result Tracker — uses Gemini API with Google Search grounding
+ * to find who won closed BESS tenders.
  *
- * Uses DuckDuckGo HTML search to find news articles about tender results,
- * then LLM extracts winners, prices, bidders from the article text.
+ * One API call per tender. Gemini searches the web and returns structured results.
+ * No scraping, no article fetching, no local LLM needed.
  *
  * Usage:
  *   node scraper/result-tracker.js           # All closed tenders
  *   node scraper/result-tracker.js <nitNo>   # Specific tender
+ *
+ * Requires: GEMINI_API_KEY in .env
  */
 import "dotenv/config";
-import axios from "axios";
-import * as cheerio from "cheerio";
 import { initializeApp } from "firebase/app";
 import {
   getFirestore, collection, getDocs, doc, updateDoc, addDoc, setDoc, Timestamp,
 } from "firebase/firestore";
 import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
-import { extractTenderResult, isLlmAvailable } from "./llm.js";
 
-const USER_AGENT =
-  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36";
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
 
 const KNOWN_AUTHORITIES = [
   "SECI", "NTPC", "NGEL", "NUGEL", "GUVNL", "MSEDCL", "RRVUNL", "PSPCL",
@@ -37,6 +37,10 @@ function detectAuthority(tender) {
   return null;
 }
 
+function slugify(name) {
+  return name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60);
+}
+
 // Firebase init
 const app = initializeApp({
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -48,62 +52,77 @@ await signInWithEmailAndPassword(authFb, process.env.FIREBASE_SCRAPER_EMAIL, pro
 const db = getFirestore(app);
 
 /**
- * Search DuckDuckGo HTML (no JS needed, no redirects, direct article URLs).
- * Restricts to energy news sites for accuracy.
+ * Ask Gemini (with Google Search grounding) about a tender result.
+ * Returns structured JSON with winners, bidders, prices.
  */
-async function searchDuckDuckGo(query) {
-  const articles = [];
+async function askGemini(query) {
   try {
-    const siteFilter = "site:mercomindia.com OR site:saurenergy.com OR site:pv-magazine-india.com OR site:solarquarter.com";
-    const fullQuery = `${query} ${siteFilter}`;
-    const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(fullQuery)}`;
+    const resp = await fetch(`${GEMINI_URL}?key=${GEMINI_API_KEY}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{
+            text: `You are an expert on Indian BESS (Battery Energy Storage System) tenders.
 
-    const resp = await axios.get(url, {
-      headers: { "User-Agent": USER_AGENT },
-      timeout: 15000,
-    });
-    const $ = cheerio.load(resp.data);
+Search the web and answer this question. If the tender result has NOT been announced yet, say "not announced".
 
-    $(".result__a").each((_i, el) => {
-      const title = $(el).text().trim();
-      const href = $(el).attr("href") || "";
-      const match = href.match(/uddg=([^&]+)/);
-      const realUrl = match ? decodeURIComponent(match[1]) : href;
+Question: ${query}
 
-      if (!title || title.length < 15 || !realUrl.startsWith("http")) return;
-
-      const titleLower = title.toLowerCase();
-      const isResult = ["award", "won", "winner", "result", "select", "lowest", "l1", "bags", "secures", "announces"].some(
-        (kw) => titleLower.includes(kw)
-      );
-      if (isResult) {
-        articles.push({ title, link: realUrl, source: "DuckDuckGo" });
-      }
-    });
-  } catch { /* skip */ }
-  return articles;
+Respond ONLY with valid JSON in this exact format (no markdown, no explanation):
+{
+  "announced": true or false,
+  "winners": [{"company": "name", "capacityMWh": number or null, "priceLakhsPerMW": number or null, "priceRsPerKWh": number or null}],
+  "bidders": ["company1", "company2"],
+  "developer": "company name or null",
+  "state": "state name or null",
+  "resultSummary": "one sentence summary"
 }
 
-/**
- * Fetch article text from a URL.
- */
-async function fetchArticleText(url) {
-  try {
-    const resp = await axios.get(url, { headers: { "User-Agent": USER_AGENT }, timeout: 15000 });
-    const $ = cheerio.load(resp.data);
-    $("nav, footer, .sidebar, .ad, script, style, .related-posts, .comments").remove();
-    const articleEl = $("article, .entry-content, .post-content, .article-content, .td-post-content, main").first();
-    return (articleEl.length ? articleEl.text() : $("body").text()).replace(/\s+/g, " ").trim().slice(0, 10000);
-  } catch { return null; }
-}
+If result is not announced, return: {"announced": false, "winners": null, "bidders": null, "developer": null, "state": null, "resultSummary": "Result not yet announced"}`,
+          }],
+        }],
+        generationConfig: {
+          temperature: 0.1,
+          maxOutputTokens: 1024,
+        },
+        tools: [{
+          google_search: {},
+        }],
+      }),
+    });
 
-function slugify(name) {
-  return name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60);
+    if (!resp.ok) {
+      const errText = await resp.text();
+      console.log(`  [Gemini] API error ${resp.status}: ${errText.slice(0, 200)}`);
+      return null;
+    }
+
+    const data = await resp.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+
+    // Extract JSON from response (might have markdown code blocks)
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      console.log(`  [Gemini] No JSON in response: ${text.slice(0, 200)}`);
+      return null;
+    }
+
+    try {
+      return JSON.parse(jsonMatch[0]);
+    } catch {
+      console.log(`  [Gemini] Invalid JSON: ${jsonMatch[0].slice(0, 200)}`);
+      return null;
+    }
+  } catch (err) {
+    console.log(`  [Gemini] Error: ${err.message}`);
+    return null;
+  }
 }
 
 async function main() {
-  if (!(await isLlmAvailable())) {
-    console.error("Ollama is not running. Start with: ollama serve");
+  if (!GEMINI_API_KEY) {
+    console.error("GEMINI_API_KEY not set in .env");
     process.exit(1);
   }
 
@@ -118,10 +137,11 @@ async function main() {
     return !!detectAuthority(t);
   });
 
-  console.log(`\nFound ${candidates.length} closed tenders with real authority names\n`);
+  console.log(`\nFound ${candidates.length} closed tenders to check\n`);
 
   let updated = 0;
   let bidsCreated = 0;
+  let skipped = 0;
 
   for (const tender of candidates) {
     const realAuthority = detectAuthority(tender);
@@ -131,59 +151,22 @@ async function main() {
     console.log(`${(tender.title || "").slice(0, 80)}`);
     console.log(`Authority: ${realAuthority} | ${tender.powerMW || "?"}MW / ${tender.energyMWh || "?"}MWh`);
 
-    // Build search query
-    const queryParts = [realAuthority];
-    if (tender.powerMW) queryParts.push(`${tender.powerMW}MW`);
-    if (tender.energyMWh) queryParts.push(`${tender.energyMWh}MWh`);
-    queryParts.push("BESS tender result winner");
-    const query = queryParts.join(" ");
+    // Ask Gemini
+    const question = `Who won the ${realAuthority} ${tender.powerMW || ""}MW ${tender.energyMWh || ""}MWh BESS tender in India? NIT: ${tender.nitNumber}. Title: ${(tender.title || "").slice(0, 100)}`;
+    console.log(`  Asking Gemini...`);
 
-    console.log(`  Query: "${query}"`);
+    const result = await askGemini(question);
 
-    // Search DuckDuckGo
-    const articles = await searchDuckDuckGo(query);
-
-    // Filter by relevance — must mention authority
-    const authLower = realAuthority.toLowerCase();
-    const relevant = articles.filter((a) => a.title.toLowerCase().includes(authLower));
-
-    if (relevant.length === 0) {
-      console.log(`  → No relevant articles found`);
+    if (!result) {
+      console.log("  → Gemini returned null, skipping");
+      skipped++;
       await new Promise((r) => setTimeout(r, 2000));
       continue;
     }
 
-    console.log(`  Found ${relevant.length} article(s):`);
-    relevant.slice(0, 3).forEach((a) => console.log(`    - ${a.title.slice(0, 70)}`));
-
-    // Try each article
-    let result = null;
-    let usedUrl = null;
-
-    for (const article of relevant.slice(0, 3)) {
-      console.log(`  Fetching: ${article.link.slice(0, 70)}`);
-      const text = await fetchArticleText(article.link);
-
-      if (!text || text.length < 300) {
-        console.log(`  → Too short (${text?.length || 0} chars), next`);
-        continue;
-      }
-
-      console.log(`  ${text.length} chars. Asking LLM...`);
-      const llmResult = await extractTenderResult(text, tender.title || "");
-
-      if (!llmResult?.winners?.length || !llmResult.winners[0]?.company) {
-        console.log("  → No winners, next");
-        continue;
-      }
-
-      result = llmResult;
-      usedUrl = article.link;
-      break;
-    }
-
-    if (!result) {
-      console.log("  → No valid result, skipping");
+    if (!result.announced || !result.winners || !Array.isArray(result.winners) || result.winners.length === 0) {
+      console.log(`  → ${result.resultSummary || "Not announced yet"}`);
+      skipped++;
       await new Promise((r) => setTimeout(r, 2000));
       continue;
     }
@@ -193,10 +176,18 @@ async function main() {
     for (const w of result.winners) {
       console.log(`    Winner: ${w.company} — ${w.capacityMWh || "?"}MWh @ ${w.priceLakhsPerMW || w.priceRsPerKWh || "?"}`);
     }
-    const bidders = Array.isArray(result.bidders) ? result.bidders : (typeof result.bidders === "string" ? [result.bidders] : []);
+
+    const bidders = Array.isArray(result.bidders) ? result.bidders : [];
+    if (bidders.length > 0) console.log(`    Bidders: ${bidders.join(", ")}`);
 
     // Write to Firestore
     const awardedTo = result.winners[0].company;
+    if (!awardedTo || awardedTo.length < 2) {
+      console.log("  → Empty winner name, skipping");
+      skipped++;
+      continue;
+    }
+
     await updateDoc(doc(db, "tenders", tender.nitNumber), {
       awardedTo,
       developedBy: (result.developer && result.developer !== "null") ? result.developer : null,
@@ -206,6 +197,7 @@ async function main() {
     console.log(`  → Updated: awarded to ${awardedTo}`);
     updated++;
 
+    // Create bid records for winners
     for (const w of result.winners) {
       if (!w.company) continue;
       const cid = slugify(w.company);
@@ -215,11 +207,12 @@ async function main() {
         tenderName: realAuthority, category: tender.category || null,
         capacityMWh: w.capacityMWh || null, priceStandalone: w.priceLakhsPerMW || null,
         priceFDRE: w.priceRsPerKWh || null, state: result.state || tender.state || null,
-        result: "won", reference: usedUrl,
+        result: "won", reference: "Gemini Search",
       });
       bidsCreated++;
     }
 
+    // Create bid records for losers
     if (bidders.length > 0) {
       const winnerNames = new Set(result.winners.map((w) => w.company?.toLowerCase()));
       for (const bidder of bidders) {
@@ -230,17 +223,17 @@ async function main() {
           companyId: cid, companyName: bidder, tenderNit: tender.nitNumber,
           tenderName: realAuthority, category: tender.category || null,
           capacityMWh: null, priceStandalone: null, priceFDRE: null,
-          state: result.state || tender.state || null, result: "lost", reference: usedUrl,
+          state: result.state || tender.state || null, result: "lost", reference: "Gemini Search",
         });
         bidsCreated++;
       }
     }
 
-    await new Promise((r) => setTimeout(r, 3000)); // rate limit DDG
+    await new Promise((r) => setTimeout(r, 3000)); // rate limit
   }
 
   console.log(`\n${"═".repeat(60)}`);
-  console.log(`Done. Tenders updated: ${updated} | Bid records created: ${bidsCreated}`);
+  console.log(`Done. Updated: ${updated} | Bids created: ${bidsCreated} | Skipped: ${skipped}`);
   process.exit(0);
 }
 
