@@ -273,6 +273,37 @@ export async function getAlerts(max = 20): Promise<Alert[]> {
   return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as Alert);
 }
 
+// ── Employees ──
+
+export interface Employee {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  role: string | null;
+  department: string | null;
+  createdAt: Timestamp | null;
+}
+
+export async function getEmployees(): Promise<Employee[]> {
+  const snapshot = await getDocs(collection(db, "employees"));
+  return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as Employee);
+}
+
+export async function addEmployee(data: Omit<Employee, "id">): Promise<string> {
+  const slug = data.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40);
+  await setDoc(doc(db, "employees", slug), { ...data, createdAt: Timestamp.now() });
+  return slug;
+}
+
+export async function updateEmployee(id: string, data: Partial<Employee>) {
+  await updateDoc(doc(db, "employees", id), data);
+}
+
+export async function deleteEmployee(id: string) {
+  await deleteDoc(doc(db, "employees", id));
+}
+
 // ── Companies ──
 
 export interface Company {
@@ -293,6 +324,12 @@ export async function getCompanies(): Promise<Company[]> {
 export async function getCompany(id: string): Promise<Company | null> {
   const snap = await getDoc(doc(db, "companies", id));
   return snap.exists() ? ({ id: snap.id, ...snap.data() } as Company) : null;
+}
+
+export async function addCompany(data: Omit<Company, "id">): Promise<string> {
+  const slug = data.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 60);
+  await setDoc(doc(db, "companies", slug), { ...data, createdAt: Timestamp.now() });
+  return slug;
 }
 
 export async function updateCompany(id: string, data: Partial<Company>) {

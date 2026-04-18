@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { getContacts, type Contact } from "@/lib/firestore";
+import { getContacts, addContact, type Contact } from "@/lib/firestore";
 import AuthGuard from "@/components/AuthGuard";
 import Sidebar from "@/components/Sidebar";
 
@@ -11,6 +11,31 @@ function ContactsContent() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [showAdd, setShowAdd] = useState(false);
+  const [form, setForm] = useState({ name: "", companyName: "", companyId: "", designation: "", email: "", phone: "", location: "" });
+  const [saving, setSaving] = useState(false);
+
+  const handleAdd = async () => {
+    if (!form.name.trim() || !form.companyName.trim()) return;
+    setSaving(true);
+    try {
+      const companyId = form.companyName.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 60);
+      await addContact({
+        name: form.name.trim(),
+        companyId,
+        companyName: form.companyName.trim(),
+        designation: form.designation.trim() || null,
+        email: form.email.trim() || null,
+        phone: form.phone.trim() || null,
+        location: form.location.trim() || null,
+      });
+      const updated = await getContacts();
+      setContacts(updated);
+      setForm({ name: "", companyName: "", companyId: "", designation: "", email: "", phone: "", location: "" });
+      setShowAdd(false);
+    } catch { /* */ }
+    finally { setSaving(false); }
+  };
 
   useEffect(() => {
     getContacts().then(setContacts).finally(() => setLoading(false));
@@ -29,7 +54,36 @@ function ContactsContent() {
     <div className="min-h-screen bg-gray-50">
       <Sidebar />
       <div className="sidebar-content px-6 py-4">
-        <h1 className="text-xl font-bold text-gray-900 mb-4">Contacts Directory</h1>
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="text-xl font-bold text-gray-900">Contacts Directory</h1>
+          <button onClick={() => setShowAdd(!showAdd)}
+            className="bg-[#0D1F3C] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#162d52] transition-colors">
+            {showAdd ? "Cancel" : "+ Add Contact"}
+          </button>
+        </div>
+
+        {showAdd && (
+          <div className="bg-white rounded-lg border p-5 mb-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <input type="text" placeholder="Name *" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
+                className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0D1F3C]/20" />
+              <input type="text" placeholder="Company *" value={form.companyName} onChange={(e) => setForm({ ...form, companyName: e.target.value })}
+                className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0D1F3C]/20" />
+              <input type="text" placeholder="Designation" value={form.designation} onChange={(e) => setForm({ ...form, designation: e.target.value })}
+                className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0D1F3C]/20" />
+              <input type="email" placeholder="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })}
+                className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0D1F3C]/20" />
+              <input type="text" placeholder="Phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0D1F3C]/20" />
+              <input type="text" placeholder="Location" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })}
+                className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0D1F3C]/20" />
+            </div>
+            <button onClick={handleAdd} disabled={saving || !form.name.trim() || !form.companyName.trim()}
+              className="mt-3 bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700 disabled:opacity-50">
+              {saving ? "Adding..." : "Add Contact"}
+            </button>
+          </div>
+        )}
 
         <div className="flex items-center gap-3 mb-4">
           <input type="text" placeholder="Search name, company, role, email..." value={search} onChange={(e) => setSearch(e.target.value)}

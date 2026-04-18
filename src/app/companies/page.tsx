@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { getCompanies, type Company } from "@/lib/firestore";
+import { getCompanies, addCompany, type Company } from "@/lib/firestore";
 import AuthGuard from "@/components/AuthGuard";
 import Sidebar from "@/components/Sidebar";
 
@@ -26,6 +26,22 @@ function CompaniesContent() {
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("All");
   const [sortBy, setSortBy] = useState("Bids Won (desc)");
+  const [showAdd, setShowAdd] = useState(false);
+  const [form, setForm] = useState({ name: "", type: "Developer" as "Developer" | "Board" | "Private" | "Other" });
+  const [saving, setSaving] = useState(false);
+
+  const handleAdd = async () => {
+    if (!form.name.trim()) return;
+    setSaving(true);
+    try {
+      await addCompany({ name: form.name.trim(), type: form.type, bidsWon: 0, bidsLost: 0, totalCapacityMWh: 0, createdAt: null });
+      const updated = await getCompanies();
+      setCompanies(updated);
+      setForm({ name: "", type: "Developer" });
+      setShowAdd(false);
+    } catch { /* */ }
+    finally { setSaving(false); }
+  };
 
   useEffect(() => {
     getCompanies().then(setCompanies).finally(() => setLoading(false));
@@ -54,7 +70,30 @@ function CompaniesContent() {
     <div className="min-h-screen bg-gray-50">
       <Sidebar />
       <div className="sidebar-content px-6 py-4">
-        <h1 className="text-xl font-bold text-gray-900 mb-4">Companies</h1>
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="text-xl font-bold text-gray-900">Companies</h1>
+          <button onClick={() => setShowAdd(!showAdd)}
+            className="bg-[#0D1F3C] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#162d52] transition-colors">
+            {showAdd ? "Cancel" : "+ Add Company"}
+          </button>
+        </div>
+
+        {showAdd && (
+          <div className="bg-white rounded-lg border p-5 mb-4">
+            <div className="flex items-center gap-3">
+              <input type="text" placeholder="Company Name *" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
+                className="border rounded-lg px-3 py-2 text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-[#0D1F3C]/20" />
+              <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as "Developer" | "Board" | "Private" | "Other" })}
+                className="border rounded-lg px-3 py-2 text-sm">
+                <option>Developer</option><option>Board</option><option>Private</option><option>Other</option>
+              </select>
+              <button onClick={handleAdd} disabled={saving || !form.name.trim()}
+                className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700 disabled:opacity-50">
+                {saving ? "Adding..." : "Add"}
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="flex flex-wrap items-center gap-3 mb-4">
           <input type="text" placeholder="Search company..." value={search} onChange={(e) => setSearch(e.target.value)}
