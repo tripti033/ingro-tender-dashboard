@@ -1,15 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { createTender } from "@/lib/firestore";
+import { createTender, getEmployees } from "@/lib/firestore";
 import AuthGuard from "@/components/AuthGuard";
 import Sidebar from "@/components/Sidebar";
 
 const CATEGORIES = ["Standalone", "FDRE", "S+S", "PSP", "Hybrid", "Pump Storage Plant"];
 const MODES = ["EPC", "BOOT", "BOO", "BOT", "DBOO", "DBFOO", "BOQ"];
 const CONNECTIVITY = ["STU / ISC", "ISTS"];
-const INGRO_TEAM = ["Aman", "Ankit", "Tripti", "Khushi", "Virendra"];
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -25,6 +24,11 @@ function NewTenderContent() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<Record<string, string>>({});
+  const [employeeNames, setEmployeeNames] = useState<string[]>([]);
+
+  useEffect(() => {
+    getEmployees().then((emps) => setEmployeeNames(emps.map((e) => e.name))).catch(() => {});
+  }, []);
 
   const f = (key: string) => form[key] || "";
   const sf = (key: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
@@ -112,7 +116,7 @@ function NewTenderContent() {
           <Field label="Assigned To">
             <select value={f("assignedTo")} onChange={sf("assignedTo")} className={inputClass}>
               <option value="">Select</option>
-              {INGRO_TEAM.map(t => <option key={t}>{t}</option>)}
+              {employeeNames.map(t => <option key={t}>{t}</option>)}
             </select>
           </Field>
 

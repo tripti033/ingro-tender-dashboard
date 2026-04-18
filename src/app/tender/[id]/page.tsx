@@ -6,7 +6,7 @@ import { type User } from "firebase/auth";
 import { doc, getDoc, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { onAuthChange } from "@/lib/auth";
-import { updateFlag, updateNote, updateTender, getEditHistory, getBidsByTender, type Tender, type EditHistoryEntry, type Bid } from "@/lib/firestore";
+import { updateFlag, updateNote, updateTender, getEditHistory, getBidsByTender, getEmployees, type Tender, type EditHistoryEntry, type Bid, type Employee } from "@/lib/firestore";
 import AuthGuard from "@/components/AuthGuard";
 import Sidebar from "@/components/Sidebar";
 
@@ -30,7 +30,7 @@ const STATUS_PIPELINE = [
   { value: "awarded", label: "Awarded", color: "bg-teal-500" },
 ];
 
-const INGRO_TEAM = ["Aman", "Ankit", "Tripti", "Khushi", "Virendra"];
+// Loaded dynamically from employees collection
 
 const CATEGORY_OPTIONS = ["Standalone", "FDRE", "S+S", "PSP", "Hybrid", "Pump Storage Plant"];
 const MODE_OPTIONS = ["EPC", "BOOT", "BOO", "BOT", "DBOO", "DBFOO", "BOQ"];
@@ -170,6 +170,7 @@ function TenderDetailContent() {
   // Edit history
   const [editHistory, setEditHistory] = useState<EditHistoryEntry[]>([]);
   const [tenderBids, setTenderBids] = useState<Bid[]>([]);
+  const [employeeNames, setEmployeeNames] = useState<string[]>([]);
 
   // Flag & note
   const [selectedFlag, setSelectedFlag] = useState("");
@@ -180,12 +181,13 @@ function TenderDetailContent() {
 
   useEffect(() => { return onAuthChange(setUser); }, []);
 
-  // Load edit history and bids
+  // Load edit history, bids, and employees
   useEffect(() => {
     if (id) {
       getEditHistory(id).then(setEditHistory).catch(() => {});
       getBidsByTender(id).then(setTenderBids).catch(() => {});
     }
+    getEmployees().then((emps) => setEmployeeNames(emps.map((e) => e.name))).catch(() => {});
   }, [id]);
 
   useEffect(() => {
@@ -467,7 +469,7 @@ function TenderDetailContent() {
                   <EditSelect label="Connectivity" value={f("connectivityType")} onChange={sf("connectivityType")} options={CONNECTIVITY_OPTIONS} />
                   <EditText label="Bidding Structure" value={f("biddingStructure")} onChange={sf("biddingStructure")} />
                   <EditText label="BESPA Signing" value={f("bespaSigning")} onChange={sf("bespaSigning")} />
-                  <EditSelect label="Assigned To" value={f("assignedTo")} onChange={sf("assignedTo")} options={INGRO_TEAM} />
+                  <EditSelect label="Assigned To" value={f("assignedTo")} onChange={sf("assignedTo")} options={employeeNames} />
                   <EditText label="Awarded To" value={f("awardedTo")} onChange={sf("awardedTo")} placeholder="Company that won the bid" />
                   <EditText label="Developed By" value={f("developedBy")} onChange={sf("developedBy")} placeholder="Company that develops/executes" />
                 </>
