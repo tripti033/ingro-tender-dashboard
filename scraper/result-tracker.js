@@ -19,7 +19,7 @@ import {
 import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
+const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent";
 
 const KNOWN_AUTHORITIES = [
   "SECI", "NTPC", "NGEL", "NUGEL", "GUVNL", "MSEDCL", "RRVUNL", "PSPCL",
@@ -160,14 +160,14 @@ async function main() {
     if (!result) {
       console.log("  → Gemini returned null, skipping");
       skipped++;
-      await new Promise((r) => setTimeout(r, 2000));
+      await new Promise((r) => setTimeout(r, 5000));
       continue;
     }
 
     if (!result.announced || !result.winners || !Array.isArray(result.winners) || result.winners.length === 0) {
       console.log(`  → ${result.resultSummary || "Not announced yet"}`);
       skipped++;
-      await new Promise((r) => setTimeout(r, 2000));
+      await new Promise((r) => setTimeout(r, 5000));
       continue;
     }
 
@@ -229,7 +229,7 @@ async function main() {
       }
     }
 
-    await new Promise((r) => setTimeout(r, 3000)); // rate limit
+    await new Promise((r) => setTimeout(r, 5000)); // rate limit — 15 req/min free tier
   }
 
   console.log(`\n${"═".repeat(60)}`);
