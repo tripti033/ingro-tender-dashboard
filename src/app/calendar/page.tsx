@@ -207,5 +207,5 @@ function CalendarContent() {
 }
 
 export default function CalendarPage() {
-  return <AuthGuard><Sidebar /><CalendarContent /></AuthGuard>;
+  return <AuthGuard><CalendarContent /></AuthGuard>;
 }

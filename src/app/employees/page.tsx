@@ -219,5 +219,5 @@ function EmployeesContent() {
 }
 
 export default function EmployeesPage() {
-  return <AuthGuard><Sidebar /><EmployeesContent /></AuthGuard>;
+  return <AuthGuard><EmployeesContent /></AuthGuard>;
 }

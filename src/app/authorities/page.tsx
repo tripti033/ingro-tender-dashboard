@@ -134,5 +134,5 @@ function AuthoritiesContent() {
 }
 
 export default function AuthoritiesPage() {
-  return <AuthGuard><Sidebar /><AuthoritiesContent /></AuthGuard>;
+  return <AuthGuard><AuthoritiesContent /></AuthGuard>;
 }

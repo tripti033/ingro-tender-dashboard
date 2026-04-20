@@ -171,5 +171,5 @@ function AlertsContent() {
 }
 
 export default function AlertsPage() {
-  return <AuthGuard><Sidebar /><AlertsContent /></AuthGuard>;
+  return <AuthGuard><AlertsContent /></AuthGuard>;
 }
