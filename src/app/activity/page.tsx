@@ -14,6 +14,7 @@ const TYPE_ICONS: Record<string, { icon: string; color: string }> = {
   assign: { icon: "A", color: "bg-indigo-100 text-indigo-700" },
   create: { icon: "+", color: "bg-emerald-100 text-emerald-700" },
   scrape: { icon: "R", color: "bg-cyan-100 text-cyan-700" },
+  merge: { icon: "M", color: "bg-purple-100 text-purple-700" },
 };
 
 function timeAgo(ts: { toDate?: () => Date } | null): string {
@@ -114,5 +115,5 @@ function ActivityContent() {
 }
 
 export default function ActivityPage() {
-  return <AuthGuard><Sidebar /><ActivityContent /></AuthGuard>;
+  return <AuthGuard><ActivityContent /></AuthGuard>;
 }

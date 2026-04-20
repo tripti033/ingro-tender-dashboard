@@ -2,17 +2,22 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { type User } from "firebase/auth";
+import { onAuthChange } from "@/lib/auth";
 import { getMergeSuggestions, approveMerge, rejectMerge, type MergeSuggestion } from "@/lib/firestore";
 import AuthGuard from "@/components/AuthGuard";
 import Sidebar from "@/components/Sidebar";
 
 function MergesContent() {
   const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
   const [suggestions, setSuggestions] = useState<MergeSuggestion[]>([]);
   const [loading, setLoading] = useState(true);
   const [canonicalByGroup, setCanonicalByGroup] = useState<Record<string, string>>({});
   const [workingId, setWorkingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => { return onAuthChange(setUser); }, []);
 
   useEffect(() => {
     getMergeSuggestions("pending")
@@ -33,7 +38,7 @@ function MergesContent() {
     if (!confirm(`Merge ${sources.length} companies into "${s.companies.find((c) => c.id === canonicalId)?.name}"? This cannot be undone.`)) return;
     setWorkingId(s.id);
     try {
-      await approveMerge(s.id, canonicalId, sources);
+      await approveMerge(s.id, canonicalId, sources, user?.email || undefined);
       setSuggestions((prev) => prev.filter((x) => x.id !== s.id));
     } catch (e) {
       setError(`Merge failed: ${(e as Error).message}`);

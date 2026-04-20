@@ -197,9 +197,35 @@ export async function updateTender(
     await addDoc(collection(db, "tenders", tenderId, "editHistory"), {
       editedBy: userEmail, editedByUid: userUid, editedAt: Timestamp.now(), changes,
     });
-    const fieldNames = Object.keys(changes).slice(0, 3).join(", ");
-    addActivity({ type: "edit", userEmail, tenderNit: tenderId, tenderTitle: oldTender.title || null, description: `edited ${fieldNames}${Object.keys(changes).length > 3 ? ` +${Object.keys(changes).length - 3} more` : ""}` });
+    const keys = Object.keys(changes);
+    const labels = keys.slice(0, 3).map(humanFieldLabel).join(", ");
+    addActivity({ type: "edit", userEmail, tenderNit: tenderId, tenderTitle: oldTender.title || null, description: `edited ${labels}${keys.length > 3 ? ` +${keys.length - 3} more` : ""}` });
   }
+}
+
+const FIELD_LABELS: Record<string, string> = {
+  title: "Title", category: "Category", tenderMode: "Tender Mode", authority: "Authority",
+  authorityType: "Authority Type", state: "State", location: "Location",
+  powerMW: "Power (MW)", energyMWh: "Energy (MWh)", connectivityType: "Connectivity",
+  biddingStructure: "Bidding Structure", bespaSigning: "BESPA Signing",
+  preBidDate: "Pre-Bid Date", preBidLink: "Pre-Bid Link", bidDeadline: "Bid Deadline",
+  emdDeadline: "EMD Deadline", techBidOpeningDate: "Tech Bid Opening",
+  financialBidOpeningDate: "Financial Bid Opening", documentLink: "Document Link",
+  minimumBidSize: "Minimum Bid Size", maxAllocationPerBidder: "Max Allocation",
+  gridConnected: "Grid Connected", roundTripEfficiency: "Round Trip Efficiency",
+  minimumAnnualAvailability: "Minimum Annual Availability", dailyCycles: "Daily Cycles",
+  financialClosure: "Financial Closure", scodMonths: "SCOD Months", gracePeriod: "Grace Period",
+  emdAmount: "EMD Amount", totalCost: "Total Cost", summary: "Summary",
+  contactPerson: "Contact Person", contactEmail: "Contact Email", contactPhone: "Contact Phone",
+  bidSubmissionOnline: "Bid Submission (Online)", bidSubmissionOffline: "Bid Submission (Offline)",
+  bidOpeningDate: "Bid Opening Date", awardedTo: "Awarded To", developedBy: "Developed By",
+  sourceUrl: "Source URL", assignedTo: "Assigned To",
+};
+
+function humanFieldLabel(key: string): string {
+  if (FIELD_LABELS[key]) return FIELD_LABELS[key];
+  // Fallback: camelCase → Title Case
+  return key.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase()).trim();
 }
 
 export async function getEditHistory(tenderId: string, max = 20): Promise<EditHistoryEntry[]> {
@@ -223,7 +249,7 @@ export async function updateNote(tenderId: string, uid: string, note: string) {
 
 export interface Activity {
   id: string;
-  type: "flag" | "edit" | "note" | "status" | "assign" | "create" | "scrape";
+  type: "flag" | "edit" | "note" | "status" | "assign" | "create" | "scrape" | "merge";
   userEmail: string;
   tenderNit: string | null;
   tenderTitle: string | null;
@@ -449,10 +475,16 @@ export async function rejectMerge(suggestionId: string) {
  * - Deletes source company docs
  * - Marks suggestion approved
  */
-export async function approveMerge(suggestionId: string, canonicalId: string, sourceIds: string[]) {
+export async function approveMerge(suggestionId: string, canonicalId: string, sourceIds: string[], userEmail?: string) {
   const canonicalSnap = await getDoc(doc(db, "companies", canonicalId));
   if (!canonicalSnap.exists()) throw new Error(`Canonical company ${canonicalId} not found`);
   const canonical = canonicalSnap.data() as Company;
+  const sourceNames: string[] = [];
+  for (const sid of sourceIds) {
+    if (sid === canonicalId) continue;
+    const s = await getDoc(doc(db, "companies", sid));
+    if (s.exists()) sourceNames.push((s.data() as Company).name || sid);
+  }
 
   // Reassign bids
   for (const sid of sourceIds) {
@@ -492,4 +524,17 @@ export async function approveMerge(suggestionId: string, canonicalId: string, so
     resolvedAt: Timestamp.now(),
     finalCanonicalId: canonicalId,
   });
+
+  if (userEmail && sourceNames.length > 0) {
+    const preview = sourceNames.length <= 2
+      ? sourceNames.join(" & ")
+      : `${sourceNames.slice(0, 2).join(", ")} +${sourceNames.length - 2} more`;
+    addActivity({
+      type: "merge",
+      userEmail,
+      tenderNit: null,
+      tenderTitle: null,
+      description: `merged ${preview} into "${canonical.name}"`,
+    });
+  }
 }
