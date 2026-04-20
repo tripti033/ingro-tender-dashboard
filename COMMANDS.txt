@@ -1,0 +1,165 @@
+═══════════════════════════════════════════════════════════════════
+  INGRO TENDER DASHBOARD — MANUAL COMMANDS
+═══════════════════════════════════════════════════════════════════
+
+  Always run from the project root:
+    cd ~/work/ingro-tender-dashboard
+
+
+───────────────────────────────────────────────────────────────────
+  1. DEV SERVER
+───────────────────────────────────────────────────────────────────
+
+  # Start the Next.js app locally (http://localhost:3000)
+  npm run dev
+
+  # Production build (for sanity-check before deploy)
+  npm run build
+
+  # Typecheck only (no build)
+  npx tsc --noEmit
+
+
+───────────────────────────────────────────────────────────────────
+  2. MAIN SCRAPER (runs automatically every 3h via GitHub Actions)
+───────────────────────────────────────────────────────────────────
+
+  # Scrape all sources (SECI, NTPC, GUVNL, MSEDCL, etc.)
+  node scraper/index.js
+
+
+───────────────────────────────────────────────────────────────────
+  3. BID WINNER TRACKER (Gemini API + Google Search grounding)
+───────────────────────────────────────────────────────────────────
+
+  # Check all closed tenders for winners
+  node scraper/result-tracker.js
+
+  # Check one specific tender by NIT
+  node scraper/result-tracker.js SECI-2025-TN000015
+
+  # Try a different Gemini model (free-tier daily caps: 20/day each)
+  GEMINI_MODEL=gemini-2.5-flash      node scraper/result-tracker.js
+  GEMINI_MODEL=gemini-2.5-flash-lite node scraper/result-tracker.js  # default
+
+  # Run without Google Search grounding (uses model's training data only)
+  USE_GROUNDING=false node scraper/result-tracker.js
+
+  Tip: if you hit "429 quota exceeded", switch to the other model
+  (each model has its own 20/day bucket).
+
+
+───────────────────────────────────────────────────────────────────
+  4. COMPANY MERGE SUGGESTIONS
+───────────────────────────────────────────────────────────────────
+
+  # Scan companies, write duplicate groups to /companies/merges
+  node scraper/suggest-merges.js
+
+  # Clear all pending suggestions first, then regenerate
+  node scraper/suggest-merges.js --clear
+
+  Review and approve/reject at: http://localhost:3000/companies/merges
+  (or prod: <your-vercel-url>/companies/merges)
+
+
+───────────────────────────────────────────────────────────────────
+  5. LLM TOOLS (require Ollama running locally)
+───────────────────────────────────────────────────────────────────
+
+  # Start Ollama (if not already running)
+  ollama serve
+
+  # Interactive review of LLM extractions before they go to Firestore
+  node scraper/llm-review.js                    # all tenders with gaps
+  node scraper/llm-review.js --pdf              # also extract from PDFs
+  node scraper/llm-review.js --retry-failed     # retry tenders LLM gave up on
+  node scraper/llm-review.js SECI-2025-TN000015 # a specific tender
+
+  # Note: tenders where LLM extracts nothing get llmExtractionFailed=true
+  # and are skipped on future runs. They retry automatically only with
+  # --retry-failed, or clear the flag once extraction succeeds.
+
+  # Process news alerts for relevance score + categories
+  node scraper/llm-alerts.js           # only un-scored alerts
+  node scraper/llm-alerts.js --all     # re-process everything
+
+
+───────────────────────────────────────────────────────────────────
+  6. PDF ENRICHMENT
+───────────────────────────────────────────────────────────────────
+
+  # Download PDFs, extract fields (bid dates, EMD, etc.)
+  node scraper/pdf-parser.js                    # all tenders
+  node scraper/pdf-parser.js SECI-2025-TN000015 # one tender
+
+
+───────────────────────────────────────────────────────────────────
+  7. BULK IMPORTS (one-time / rare)
+───────────────────────────────────────────────────────────────────
+
+  # Import tenders from the Excel file
+  node scraper/import-excel.js
+
+  # Import CRM (companies + contacts + bids) from Excel
+  node scraper/import-crm.js
+
+
+───────────────────────────────────────────────────────────────────
+  8. GIT / DEPLOY
+───────────────────────────────────────────────────────────────────
+
+  # See what changed
+  git status
+  git diff
+
+  # Commit + push (Vercel auto-deploys on push to main)
+  git add <files>
+  git commit -m "your message"
+  git push
+
+  # Manually trigger the GitHub Actions scrape
+  gh workflow run scrape.yml
+
+
+───────────────────────────────────────────────────────────────────
+  9. ENVIRONMENT VARIABLES (.env in project root)
+───────────────────────────────────────────────────────────────────
+
+  Required for scraping + writes:
+    NEXT_PUBLIC_FIREBASE_API_KEY
+    NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+    NEXT_PUBLIC_FIREBASE_APP_ID
+    FIREBASE_SCRAPER_EMAIL       (scraper@ingroenergy.com)
+    FIREBASE_SCRAPER_PASSWORD
+
+  Required for result-tracker:
+    GEMINI_API_KEY
+
+  Optional overrides:
+    GEMINI_MODEL       (default: gemini-2.5-flash-lite)
+    USE_GROUNDING      (default: true — set to "false" to disable)
+
+
+───────────────────────────────────────────────────────────────────
+  TYPICAL WORKFLOWS
+───────────────────────────────────────────────────────────────────
+
+  A) "Check who won the recently closed tenders":
+       node scraper/result-tracker.js
+
+  B) "Clean up duplicate companies":
+       node scraper/suggest-merges.js
+       → then review at /companies/merges
+
+  C) "Force a fresh scrape without waiting for cron":
+       node scraper/index.js
+       node scraper/suggest-merges.js
+
+  D) "Re-check a single tender":
+       node scraper/result-tracker.js <NIT-NUMBER>
+       node scraper/pdf-parser.js     <NIT-NUMBER>
+
+═══════════════════════════════════════════════════════════════════

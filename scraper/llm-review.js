@@ -3,9 +3,14 @@
  * for human approval before writing to Firestore.
  *
  * Usage:
- *   node scraper/llm-review.js              # Review all tenders with gaps
- *   node scraper/llm-review.js --pdf        # Also extract from PDFs
- *   node scraper/llm-review.js <nitNumber>  # Review a specific tender
+ *   node scraper/llm-review.js                # Review all tenders with gaps
+ *   node scraper/llm-review.js --pdf          # Also extract from PDFs
+ *   node scraper/llm-review.js --retry-failed # Include tenders LLM previously failed on
+ *   node scraper/llm-review.js <nitNumber>    # Review a specific tender
+ *
+ * Tenders where LLM extracts nothing get llmExtractionFailed: true so
+ * they are skipped on future runs. Pass --retry-failed to include them,
+ * or extract succeeds once → the flag clears automatically.
  *
  * Controls:
  *   y = approve and write to Firestore
@@ -40,6 +45,7 @@ const db = getFirestore(app);
 
 const args = process.argv.slice(2);
 const doPdf = args.includes("--pdf");
+const retryFailed = args.includes("--retry-failed");
 const targetNit = args.find((a) => !a.startsWith("--"));
 
 // ── Readline for user input ──
@@ -87,6 +93,9 @@ async function main() {
   // Filter candidates
   const candidates = allTenders.filter((t) => {
     if (targetNit) return t.nitNumber === targetNit;
+    // Skip tenders where LLM previously returned nothing useful,
+    // unless --retry-failed is passed
+    if (t.llmExtractionFailed && !retryFailed) return false;
     // Has gaps in key fields
     return (
       t.powerMW == null ||
@@ -98,7 +107,8 @@ async function main() {
     );
   });
 
-  console.log(`${candidates.length} tenders need enrichment\n`);
+  const failedSkipped = allTenders.filter((t) => t.llmExtractionFailed && !retryFailed).length;
+  console.log(`${candidates.length} tenders need enrichment${failedSkipped > 0 ? ` (${failedSkipped} previously failed, run with --retry-failed to include)` : ""}\n`);
   console.log(`${BOLD}Controls: y=approve  n=skip  a=approve-all  q=quit${RESET}\n`);
 
   let approveAll = false;
@@ -181,7 +191,15 @@ async function main() {
     // ── Step 3: Approval ──
 
     if (!hasChanges) {
-      console.log(`  ${DIM}(no changes to make)${RESET}`);
+      console.log(`  ${DIM}(no changes to make — marking llmExtractionFailed)${RESET}`);
+      try {
+        await updateDoc(doc(db, "tenders", tender.nitNumber), {
+          llmExtractionFailed: true,
+          llmExtractionAttemptedAt: Timestamp.now(),
+        });
+      } catch (err) {
+        console.log(`  ${RED}Failed-flag write failed: ${err.message}${RESET}`);
+      }
       skipped++;
       continue;
     }
@@ -208,6 +226,8 @@ async function main() {
       try {
         await updateDoc(doc(db, "tenders", tender.nitNumber), {
           ...updates,
+          llmExtractionFailed: false,
+          llmExtractionAttemptedAt: Timestamp.now(),
           lastUpdatedAt: Timestamp.now(),
         });
         console.log(`  ${GREEN}Written to Firestore${RESET}`);
