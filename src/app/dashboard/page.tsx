@@ -81,6 +81,25 @@ function truncate(str: string | null, max: number): string {
   return str.length > max ? str.slice(0, max) + "\u2026" : str;
 }
 
+// Derive a fresh daysLeft from bidDeadline so client-side "active" /
+// "closing soon" filters don't depend on a value stamped hours ago.
+function liveDaysLeft(t: Tender): number | null {
+  if (!t.bidDeadline) return t.daysLeft ?? null;
+  try {
+    const d = typeof t.bidDeadline.toDate === "function" ? t.bidDeadline.toDate() : new Date(t.bidDeadline as unknown as string);
+    return Math.ceil((d.getTime() - Date.now()) / 86400000);
+  } catch { return t.daysLeft ?? null; }
+}
+
+function liveStatus(t: Tender): "active" | "closing_soon" | "closed" | "awarded" | "cancelled" {
+  if (t.tenderStatus === "awarded") return "awarded";
+  if (t.tenderStatus === "cancelled") return "cancelled";
+  const days = liveDaysLeft(t);
+  if (days != null && days < 0) return "closed";
+  if (days != null && days <= 7) return "closing_soon";
+  return "active";
+}
+
 function DashboardContent() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
@@ -129,7 +148,8 @@ function DashboardContent() {
   }, [search, category, authority, status, sortBy]);
 
   const filtered = useMemo(() => {
-    let result = tenders.filter((t) => t.tenderStatus !== "closed");
+    // Exclude both stale-closed and live-closed tenders (they belong in /archives)
+    let result = tenders.filter((t) => t.tenderStatus !== "closed" && liveStatus(t) !== "closed");
     if (search) {
       const q = search.toLowerCase();
       result = result.filter((t) =>
@@ -146,8 +166,8 @@ function DashboardContent() {
         result = result.filter((t) => t.authority === authority);
       }
     }
-    if (status === "Active") result = result.filter((t) => t.tenderStatus === "active");
-    else if (status === "Closing Soon") result = result.filter((t) => t.tenderStatus === "closing_soon");
+    if (status === "Active") result = result.filter((t) => liveStatus(t) === "active");
+    else if (status === "Closing Soon") result = result.filter((t) => liveStatus(t) === "closing_soon");
 
     result.sort((a, b) => {
       switch (sortBy) {
@@ -214,18 +234,30 @@ function DashboardContent() {
             onChange={(e) => setSearch(e.target.value)}
             className="border rounded-lg px-3 py-2 text-sm w-64 focus:outline-none focus:ring-2 focus:ring-[#0D1F3C]/20"
           />
-          <select value={category} onChange={(e) => setCategory(e.target.value)} className="border rounded-lg px-3 py-2 text-sm">
-            {CATEGORIES.map((c) => (<option key={c}>{c}</option>))}
-          </select>
-          <select value={authority} onChange={(e) => setAuthority(e.target.value)} className="border rounded-lg px-3 py-2 text-sm">
-            {AUTHORITIES.map((a) => (<option key={a}>{a}</option>))}
-          </select>
-          <select value={status} onChange={(e) => setStatus(e.target.value)} className="border rounded-lg px-3 py-2 text-sm">
-            {STATUSES.map((s) => (<option key={s}>{s}</option>))}
-          </select>
-          <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="border rounded-lg px-3 py-2 text-sm">
-            {SORT_OPTIONS.map((s) => (<option key={s}>{s}</option>))}
-          </select>
+          <div className="flex flex-col">
+            <label className="text-[10px] text-gray-400 uppercase tracking-wider pl-1">Category</label>
+            <select value={category} onChange={(e) => setCategory(e.target.value)} className="border rounded-lg px-3 py-2 text-sm">
+              {CATEGORIES.map((c) => (<option key={c}>{c}</option>))}
+            </select>
+          </div>
+          <div className="flex flex-col">
+            <label className="text-[10px] text-gray-400 uppercase tracking-wider pl-1">Authority</label>
+            <select value={authority} onChange={(e) => setAuthority(e.target.value)} className="border rounded-lg px-3 py-2 text-sm">
+              {AUTHORITIES.map((a) => (<option key={a}>{a}</option>))}
+            </select>
+          </div>
+          <div className="flex flex-col">
+            <label className="text-[10px] text-gray-400 uppercase tracking-wider pl-1">Status</label>
+            <select value={status} onChange={(e) => setStatus(e.target.value)} className="border rounded-lg px-3 py-2 text-sm">
+              {STATUSES.map((s) => (<option key={s}>{s}</option>))}
+            </select>
+          </div>
+          <div className="flex flex-col">
+            <label className="text-[10px] text-gray-400 uppercase tracking-wider pl-1">Sort by</label>
+            <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="border rounded-lg px-3 py-2 text-sm">
+              {SORT_OPTIONS.map((s) => (<option key={s}>{s}</option>))}
+            </select>
+          </div>
           <span className="text-sm text-gray-400 ml-auto">
             {filtered.length === 0
               ? `0 of ${tenders.length}`
@@ -339,7 +371,7 @@ function DashboardContent() {
                     </td>
                     <td className="px-3 py-2.5 text-xs">{t.connectivityType || "\u2014"}</td>
                     <td className="px-3 py-2.5 whitespace-nowrap text-xs">{formatDate(t.bidDeadline)}</td>
-                    <td className="px-3 py-2.5">{daysLeftDisplay(t.daysLeft)}</td>
+                    <td className="px-3 py-2.5">{daysLeftDisplay(liveDaysLeft(t))}</td>
                     <td className="px-3 py-2.5 text-right text-xs">{formatINR(t.emdAmount)}</td>
                     <td className="px-3 py-2.5 text-right text-xs font-medium">{formatINR(t.totalCost)}</td>
                     <td className="px-3 py-2.5 text-xs">

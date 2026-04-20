@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { getEmployees, addEmployee, deleteEmployee, getTenders, type Employee, type Tender } from "@/lib/firestore";
+import { getEmployees, addEmployee, getTenders, type Employee, type Tender } from "@/lib/firestore";
 import AuthGuard from "@/components/AuthGuard";
 import Sidebar from "@/components/Sidebar";
 
@@ -11,7 +11,6 @@ function EmployeesContent() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [tenders, setTenders] = useState<Tender[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expanded, setExpanded] = useState<string | null>(null);
 
   // Add form
   const [showAdd, setShowAdd] = useState(false);
@@ -73,12 +72,6 @@ function EmployeesContent() {
     finally { setSaving(false); }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Remove this employee?")) return;
-    await deleteEmployee(id);
-    setEmployees((prev) => prev.filter((e) => e.id !== id));
-  };
-
   return (
     <div className="min-h-screen bg-gray-50">
       <Sidebar />
@@ -124,91 +117,34 @@ function EmployeesContent() {
             {employees.map((emp) => {
               const assignedTenders = tendersByEmployee[emp.name.toLowerCase()] || [];
               const stats = flagStats[emp.name.toLowerCase()] || {};
-              const isExpanded = expanded === emp.id;
 
               return (
-                <div key={emp.id} className="bg-white rounded-lg border overflow-hidden">
-                  <button
-                    onClick={() => setExpanded(isExpanded ? null : emp.id)}
-                    className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors text-left"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-full bg-[#0D1F3C] text-white flex items-center justify-center text-sm font-bold shrink-0">
-                        {emp.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
-                      </div>
-                      <div>
-                        <div className="font-semibold text-gray-900">{emp.name}</div>
-                        <div className="text-xs text-gray-500">
-                          {[emp.role, emp.department].filter(Boolean).join(" | ") || "No role set"}
-                        </div>
+                <button
+                  key={emp.id}
+                  onClick={() => router.push(`/employee/${encodeURIComponent(emp.id)}`)}
+                  className="w-full flex items-center justify-between px-5 py-4 bg-white rounded-lg border hover:bg-gray-50 hover:border-gray-300 transition-colors text-left"
+                >
+                  <div className="flex items-center gap-4 min-w-0">
+                    <div className="w-10 h-10 rounded-full bg-[#0D1F3C] text-white flex items-center justify-center text-sm font-bold shrink-0">
+                      {emp.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="font-semibold text-gray-900 truncate">{emp.name}</div>
+                      <div className="text-xs text-gray-500 truncate">
+                        {[emp.role, emp.department].filter(Boolean).join(" \u00B7 ") || "No role set"}
                       </div>
                     </div>
-                    <div className="flex items-center gap-4">
-                      <div className="flex items-center gap-2 text-xs">
-                        <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{assignedTenders.length} tenders</span>
-                        {stats.active && <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full">{stats.active} active</span>}
-                        {stats.closing_soon && <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">{stats.closing_soon} closing</span>}
-                        {stats.awarded && <span className="bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full">{stats.awarded} awarded</span>}
-                      </div>
-                      <span className={`text-xs text-gray-400 transition-transform ${isExpanded ? "rotate-180" : ""}`}>{"\u25BC"}</span>
+                  </div>
+                  <div className="flex items-center gap-4 whitespace-nowrap">
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{assignedTenders.length} tenders</span>
+                      {stats.active && <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full">{stats.active} active</span>}
+                      {stats.closing_soon && <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">{stats.closing_soon} closing</span>}
+                      {stats.awarded && <span className="bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full">{stats.awarded} awarded</span>}
                     </div>
-                  </button>
-
-                  {isExpanded && (
-                    <div className="border-t">
-                      {/* Employee details */}
-                      <div className="px-5 py-3 bg-gray-50 flex items-center gap-6 text-sm">
-                        {emp.email && (
-                          <a href={`mailto:${emp.email}`} className="text-blue-600 hover:underline">{emp.email}</a>
-                        )}
-                        {emp.phone && (
-                          <a href={`tel:${emp.phone}`} className="text-blue-600 hover:underline">{emp.phone}</a>
-                        )}
-                        <button onClick={() => handleDelete(emp.id)} className="text-red-500 hover:underline text-xs ml-auto">
-                          Remove Employee
-                        </button>
-                      </div>
-
-                      {/* Assigned tenders */}
-                      {assignedTenders.length === 0 ? (
-                        <div className="px-5 py-4 text-sm text-gray-400">No tenders assigned</div>
-                      ) : (
-                        <table className="w-full text-sm">
-                          <thead className="bg-gray-50 text-left text-gray-500 text-xs uppercase">
-                            <tr>
-                              <th className="px-4 py-2">NIT</th>
-                              <th className="px-4 py-2">Title</th>
-                              <th className="px-4 py-2">Authority</th>
-                              <th className="px-4 py-2 text-right">MW</th>
-                              <th className="px-4 py-2">Status</th>
-                              <th className="px-4 py-2">Deadline</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y">
-                            {assignedTenders.map((t) => (
-                              <tr key={t.nitNumber} onClick={() => router.push(`/tender/${encodeURIComponent(t.nitNumber)}`)}
-                                className="hover:bg-gray-50 cursor-pointer">
-                                <td className="px-4 py-2 font-mono text-xs">{t.nitNumber.slice(0, 20)}</td>
-                                <td className="px-4 py-2 text-xs max-w-[250px] truncate">{t.title}</td>
-                                <td className="px-4 py-2 text-xs">{t.authority || "\u2014"}</td>
-                                <td className="px-4 py-2 text-right">{t.powerMW?.toLocaleString() || "\u2014"}</td>
-                                <td className="px-4 py-2">
-                                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                                    t.tenderStatus === "active" ? "bg-green-100 text-green-800" :
-                                    t.tenderStatus === "closing_soon" ? "bg-amber-100 text-amber-800" :
-                                    t.tenderStatus === "awarded" ? "bg-teal-100 text-teal-800" :
-                                    "bg-gray-100 text-gray-600"
-                                  }`}>{t.tenderStatus}</span>
-                                </td>
-                                <td className="px-4 py-2 text-xs">{t.bidDeadline ? (typeof t.bidDeadline.toDate === "function" ? t.bidDeadline.toDate().toLocaleDateString("en-IN", { day: "2-digit", month: "short" }) : "\u2014") : "\u2014"}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      )}
-                    </div>
-                  )}
-                </div>
+                    <span className="text-xs text-gray-400">&rarr;</span>
+                  </div>
+                </button>
               );
             })}
           </div>
