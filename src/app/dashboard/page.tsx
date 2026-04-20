@@ -13,7 +13,7 @@ const AUTHORITIES = [
   "TNGECL", "SJVNL", "DHBVN", "WBSEDCL", "MSETCL", "GeM", "Others",
 ];
 const CATEGORIES = ["All", "Standalone", "FDRE", "S+S", "PSP", "Hybrid", "Pump Storage Plant"];
-const STATUSES = ["All", "Active", "Closing Soon", "Closed"];
+const STATUSES = ["All", "Active", "Closing Soon"];
 const SORT_OPTIONS = [
   "Days Left (asc)",
   "Bid Deadline (asc)",
@@ -93,7 +93,6 @@ function DashboardContent() {
   const [authority, setAuthority] = useState("All");
   const [status, setStatus] = useState("All");
   const [sortBy, setSortBy] = useState("Recently Added");
-  const [hideClosed, setHideClosed] = useState(true);
 
   useEffect(() => { return onAuthChange(setUser); }, []);
 
@@ -105,8 +104,7 @@ function DashboardContent() {
   }, []);
 
   const filtered = useMemo(() => {
-    let result = [...tenders];
-    if (hideClosed) result = result.filter((t) => t.tenderStatus !== "closed");
+    let result = tenders.filter((t) => t.tenderStatus !== "closed");
     if (search) {
       const q = search.toLowerCase();
       result = result.filter((t) =>
@@ -125,7 +123,6 @@ function DashboardContent() {
     }
     if (status === "Active") result = result.filter((t) => t.tenderStatus === "active");
     else if (status === "Closing Soon") result = result.filter((t) => t.tenderStatus === "closing_soon");
-    else if (status === "Closed") result = result.filter((t) => t.tenderStatus === "closed");
 
     result.sort((a, b) => {
       switch (sortBy) {
@@ -146,7 +143,7 @@ function DashboardContent() {
       }
     });
     return result;
-  }, [tenders, search, category, authority, status, sortBy, hideClosed]);
+  }, [tenders, search, category, authority, status, sortBy]);
 
   const handleFlagChange = async (e: React.ChangeEvent<HTMLSelectElement>, tender: Tender) => {
     e.stopPropagation();
@@ -198,10 +195,6 @@ function DashboardContent() {
           <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="border rounded-lg px-3 py-2 text-sm">
             {SORT_OPTIONS.map((s) => (<option key={s}>{s}</option>))}
           </select>
-          <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
-            <input type="checkbox" checked={hideClosed} onChange={(e) => setHideClosed(e.target.checked)} className="rounded" />
-            Hide Closed
-          </label>
           <span className="text-sm text-gray-400 ml-auto">
             Showing {filtered.length} of {tenders.length} tenders
           </span>

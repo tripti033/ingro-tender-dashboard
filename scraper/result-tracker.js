@@ -19,8 +19,9 @@ import {
 import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash-lite";
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+const USE_GROUNDING = process.env.USE_GROUNDING !== "false";
 
 const KNOWN_AUTHORITIES = [
   "SECI", "NTPC", "NGEL", "NUGEL", "GUVNL", "MSEDCL", "RRVUNL", "PSPCL",
@@ -56,15 +57,14 @@ const db = getFirestore(app);
  * Ask Gemini (with Google Search grounding) about a tender result.
  * Returns structured JSON with winners, bidders, prices.
  */
-async function askGemini(query) {
-  try {
-    const resp = await fetch(`${GEMINI_URL}?key=${GEMINI_API_KEY}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{
-          parts: [{
-            text: `You are an expert on Indian BESS (Battery Energy Storage System) tenders.
+async function geminiCall(query, attempt = 1) {
+  const resp = await fetch(`${GEMINI_URL}?key=${GEMINI_API_KEY}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [{
+        parts: [{
+          text: `You are an expert on Indian BESS (Battery Energy Storage System) tenders.
 
 Search the web and answer this question. If the tender result has NOT been announced yet, say "not announced".
 
@@ -81,40 +81,88 @@ Respond ONLY with valid JSON in this exact format (no markdown, no explanation):
 }
 
 If result is not announced, return: {"announced": false, "winners": null, "bidders": null, "developer": null, "state": null, "resultSummary": "Result not yet announced"}`,
-          }],
         }],
-        generationConfig: {
-          temperature: 0.1,
-          maxOutputTokens: 1024,
-        },
-        tools: [{
-          google_search: {},
-        }],
-      }),
-    });
+      }],
+      generationConfig: {
+        temperature: 0.1,
+        maxOutputTokens: 8192,
+      },
+      ...(USE_GROUNDING ? { tools: [{ google_search: {} }] } : {}),
+    }),
+  });
+
+  // Retry 503 once with backoff
+  if (resp.status === 503 && attempt === 1) {
+    console.log(`  [Gemini] 503 transient, retrying in 20s...`);
+    await new Promise((r) => setTimeout(r, 20000));
+    return geminiCall(query, 2);
+  }
+
+  return resp;
+}
+
+function salvageJson(text) {
+  // Strip markdown fences
+  let s = text.replace(/```json\s*/g, "").replace(/```/g, "").trim();
+  const start = s.indexOf("{");
+  if (start === -1) return null;
+  s = s.slice(start);
+
+  // Try direct parse
+  try { return JSON.parse(s); } catch {}
+
+  // Walk and close dangling structures (handles truncated JSON)
+  const stack = [];
+  let inStr = false, esc = false, lastGood = -1;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (esc) { esc = false; continue; }
+    if (c === "\\") { esc = true; continue; }
+    if (c === '"') { inStr = !inStr; continue; }
+    if (inStr) continue;
+    if (c === "{" || c === "[") stack.push(c);
+    else if (c === "}" || c === "]") { stack.pop(); lastGood = i; }
+    else if (c === "," && stack.length > 0) lastGood = i;
+  }
+
+  // Truncate to last valid comma/brace, strip trailing comma, close open structures
+  let truncated = lastGood > 0 ? s.slice(0, lastGood + 1) : s;
+  truncated = truncated.replace(/,\s*$/, "");
+  // Close any strings left open
+  if (inStr) truncated += '"';
+  // Close remaining stack
+  const closeStack = [...stack];
+  while (closeStack.length) {
+    const open = closeStack.pop();
+    truncated += open === "{" ? "}" : "]";
+  }
+
+  try { return JSON.parse(truncated); } catch { return null; }
+}
+
+async function askGemini(query) {
+  try {
+    const resp = await geminiCall(query);
 
     if (!resp.ok) {
       const errText = await resp.text();
-      console.log(`  [Gemini] API error ${resp.status}: ${errText.slice(0, 200)}`);
+      console.log(`  [Gemini] API error ${resp.status}:\n${errText}`);
       return null;
     }
 
     const data = await resp.json();
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    const finishReason = data.candidates?.[0]?.finishReason;
 
-    // Extract JSON from response (might have markdown code blocks)
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      console.log(`  [Gemini] No JSON in response: ${text.slice(0, 200)}`);
+    const parsed = salvageJson(text);
+    if (!parsed) {
+      console.log(`  [Gemini] No parseable JSON (finish=${finishReason}): ${text.slice(0, 200)}`);
       return null;
     }
-
-    try {
-      return JSON.parse(jsonMatch[0]);
-    } catch {
-      console.log(`  [Gemini] Invalid JSON: ${jsonMatch[0].slice(0, 200)}`);
-      return null;
+    if (finishReason === "MAX_TOKENS") {
+      console.log(`  [Gemini] WARN: response hit MAX_TOKENS, data may be incomplete`);
     }
+    return parsed;
   } catch (err) {
     console.log(`  [Gemini] Error: ${err.message}`);
     return null;
