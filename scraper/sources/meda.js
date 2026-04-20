@@ -1,0 +1,107 @@
+import axios from "axios";
+import * as cheerio from "cheerio";
+import { BESS_KEYWORDS } from "../keywords.js";
+
+const MEDA_URL = "https://www.mahaurja.maharashtra.gov.in/Site/1607/Tenders-Or-EOI";
+const MEDA_BASE = "https://www.mahaurja.maharashtra.gov.in";
+
+const USER_AGENT =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36";
+
+// Marathi BESS-related terms. Source content is in Marathi; only NIT numbers
+// and document URLs are language-independent. We match both English and
+// Marathi keywords so the filter works whichever language the page serves.
+const BESS_KEYWORDS_MR = [
+  "बॅटरी",          // battery
+  "लिथियम",         // lithium
+  "ऊर्जा साठवण",   // energy storage
+  "साठवण प्रणाली", // storage system
+  "बीएमएस",         // BMS
+  "पंप स्टोरेज",   // pumped storage
+  "पंप्ड स्टोरेज", // pumped storage (alt)
+  "एमडब्ल्यूएच",   // MWh (transliterated)
+];
+
+/**
+ * Scrape MEDA (Maharashtra Energy Development Agency) tenders page.
+ *
+ * Static HTML table with two columns: Particulars (Marathi description
+ * containing NIT like "2026_MEDA_1293598_1") and Details (PDF download links).
+ * No JS rendering needed — axios + cheerio is enough.
+ */
+export async function scrapeMeda() {
+  const response = await axios.get(MEDA_URL, {
+    headers: { "User-Agent": USER_AGENT },
+    timeout: 45000,
+  });
+
+  const $ = cheerio.load(response.data);
+  const tenders = [];
+  const seenNits = new Set();
+
+  $("table tr").each((_i, row) => {
+    const cells = $(row).find("td");
+    if (cells.length < 2) return; // header or malformed row
+
+    const particulars = $(cells[0]).text().replace(/\s+/g, " ").trim();
+    const detailsCell = $(cells[1]);
+    if (!particulars) return;
+
+    // BESS filter — match either English or Marathi keywords
+    const particularsLower = particulars.toLowerCase();
+    const isBESS =
+      BESS_KEYWORDS.some((kw) => particularsLower.includes(kw)) ||
+      BESS_KEYWORDS_MR.some((kw) => particulars.includes(kw));
+    if (!isBESS) return;
+
+    // First PDF link in Details cell (language-independent, has NIT in filename)
+    const docLink = detailsCell
+      .find("a[href]")
+      .map((_j, a) => $(a).attr("href"))
+      .get()
+      .find((h) => h && !h.startsWith("#") && !h.startsWith("javascript:")) || null;
+
+    // Extract NIT — prefer PDF filename (e.g. 2026_MEDA_1293598_1.pdf),
+    // fall back to inline pattern in particulars text.
+    let nitNumber = null;
+    if (docLink) {
+      const fileMatch = docLink.match(/\/([^/]+?)\.pdf\b/i);
+      if (fileMatch) nitNumber = fileMatch[1];
+    }
+    if (!nitNumber) {
+      const inline = particulars.match(/\b(\d{4}_MEDA_\d+_\d+)\b/i);
+      if (inline) nitNumber = inline[1];
+    }
+    if (!nitNumber || seenNits.has(nitNumber)) return;
+    seenNits.add(nitNumber);
+
+    const documentLink = docLink
+      ? (docLink.startsWith("http") ? docLink : `${MEDA_BASE}${docLink.startsWith("/") ? "" : "/"}${docLink}`)
+      : null;
+
+    // Capacity hints (look for English digits + MW/MWh/KW)
+    const mwMatch = particulars.match(/(\d[\d,]*(?:\.\d+)?)\s*MW(?!h)/i);
+    const mwhMatch = particulars.match(/(\d[\d,]*(?:\.\d+)?)\s*MWh/i);
+    const kwMatch = !mwMatch ? particulars.match(/(\d[\d,]*(?:\.\d+)?)\s*KW\b/i) : null;
+    const powerMW = mwMatch
+      ? parseFloat(mwMatch[1].replace(/,/g, ""))
+      : kwMatch ? parseFloat(kwMatch[1].replace(/,/g, "")) / 1000 : null;
+    const energyMWh = mwhMatch ? parseFloat(mwhMatch[1].replace(/,/g, "")) : null;
+
+    tenders.push({
+      nitNumber,
+      title: particulars.slice(0, 300),
+      authority: "MEDA",
+      state: "Maharashtra",
+      powerMW,
+      energyMWh,
+      bidDeadline: null,
+      documentLink,
+      sourceUrl: MEDA_URL,
+      source: "MEDA",
+    });
+  });
+
+  console.log(`[MEDA] Found ${tenders.length} BESS-related tenders`);
+  return tenders;
+}

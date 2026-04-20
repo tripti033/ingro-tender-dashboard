@@ -12,6 +12,7 @@ import { scrapeUktenders } from "./sources/uktenders.js";
 import { scrapeHppcl } from "./sources/hppcl.js";
 import { scrapeTenderDetail } from "./sources/tenderdetail.js";
 import { scrapeNgel } from "./sources/ngel.js";
+import { scrapeMeda } from "./sources/meda.js";
 import { normaliseToSchema } from "./normaliser.js";
 import { deduplicate } from "./dedup.js";
 import { writeTenders, writeAlerts, writeIngestionLog } from "./firestore.js";
@@ -35,6 +36,7 @@ const SOURCES = [
   { name: "HPPCL", fn: scrapeHppcl },
   { name: "TenderDetail", fn: scrapeTenderDetail },
   { name: "NGEL", fn: scrapeNgel },
+  { name: "MEDA", fn: scrapeMeda },
 ];
 
 async function main() {
