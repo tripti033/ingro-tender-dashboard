@@ -93,15 +93,40 @@ function DashboardContent() {
   const [authority, setAuthority] = useState("All");
   const [status, setStatus] = useState("All");
   const [sortBy, setSortBy] = useState("Recently Added");
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 50;
 
   useEffect(() => { return onAuthChange(setUser); }, []);
 
+  const loadTenders = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await getTenders();
+      setTenders(data);
+    } catch {
+      // One silent retry to dodge the auth-token-not-ready race
+      try {
+        await new Promise((r) => setTimeout(r, 800));
+        const data = await getTenders();
+        setTenders(data);
+      } catch {
+        setError("Failed to load tenders.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    getTenders()
-      .then(setTenders)
-      .catch(() => setError("Failed to load tenders. Please refresh."))
-      .finally(() => setLoading(false));
+    loadTenders();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Reset to page 1 whenever filters change
+  useEffect(() => {
+    setPage(1);
+  }, [search, category, authority, status, sortBy]);
 
   const filtered = useMemo(() => {
     let result = tenders.filter((t) => t.tenderStatus !== "closed");
@@ -144,6 +169,12 @@ function DashboardContent() {
     });
     return result;
   }, [tenders, search, category, authority, status, sortBy]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pageStart = (currentPage - 1) * PAGE_SIZE;
+  const pageEnd = Math.min(pageStart + PAGE_SIZE, filtered.length);
+  const pageRows = filtered.slice(pageStart, pageEnd);
 
   const handleFlagChange = async (e: React.ChangeEvent<HTMLSelectElement>, tender: Tender) => {
     e.stopPropagation();
@@ -196,7 +227,9 @@ function DashboardContent() {
             {SORT_OPTIONS.map((s) => (<option key={s}>{s}</option>))}
           </select>
           <span className="text-sm text-gray-400 ml-auto">
-            Showing {filtered.length} of {tenders.length} tenders
+            {filtered.length === 0
+              ? `0 of ${tenders.length}`
+              : `Showing ${pageStart + 1}\u2013${pageEnd} of ${filtered.length}${filtered.length !== tenders.length ? ` (filtered from ${tenders.length})` : ""}`}
           </span>
           <button onClick={() => router.push("/tender/new")}
             className="bg-[#0D1F3C] text-white px-3 py-2 rounded-lg text-sm hover:bg-[#162d52] transition-colors">
@@ -212,7 +245,15 @@ function DashboardContent() {
             {[...Array(8)].map((_, i) => (<div key={i} className="h-12 bg-gray-100 rounded animate-pulse" />))}
           </div>
         ) : error ? (
-          <div className="text-center py-16 text-red-600">{error}</div>
+          <div className="text-center py-16">
+            <div className="text-red-600 mb-3">{error}</div>
+            <button
+              onClick={loadTenders}
+              className="bg-[#0D1F3C] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#162d52] transition-colors"
+            >
+              Retry
+            </button>
+          </div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-16 text-gray-400">No tenders match your filters</div>
         ) : (
@@ -239,7 +280,7 @@ function DashboardContent() {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {filtered.map((t) => (
+                {pageRows.map((t) => (
                   <tr
                     key={t.nitNumber}
                     onClick={() => {
@@ -330,6 +371,42 @@ function DashboardContent() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {!loading && !error && totalPages > 1 && (
+          <div className="flex items-center justify-between mt-4 text-sm">
+            <div className="text-gray-500">Page {currentPage} of {totalPages}</div>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setPage(1)}
+                disabled={currentPage === 1}
+                className="px-3 py-1.5 rounded border border-gray-300 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                &laquo; First
+              </button>
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1.5 rounded border border-gray-300 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Prev
+              </button>
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1.5 rounded border border-gray-300 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
+              <button
+                onClick={() => setPage(totalPages)}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1.5 rounded border border-gray-300 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Last &raquo;
+              </button>
+            </div>
           </div>
         )}
       </div>

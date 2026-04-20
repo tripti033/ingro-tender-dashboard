@@ -71,13 +71,36 @@ function ArchivesContent() {
   const [authority, setAuthority] = useState("All");
   const [awardFilter, setAwardFilter] = useState("All");
   const [sortBy, setSortBy] = useState("Recently Closed");
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 50;
+
+  const loadTenders = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const all = await getTenders();
+      setTenders(all.filter((t) => t.tenderStatus === "closed"));
+    } catch {
+      try {
+        await new Promise((r) => setTimeout(r, 800));
+        const all = await getTenders();
+        setTenders(all.filter((t) => t.tenderStatus === "closed"));
+      } catch {
+        setError("Failed to load archives.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    getTenders()
-      .then((all) => setTenders(all.filter((t) => t.tenderStatus === "closed")))
-      .catch(() => setError("Failed to load archives. Please refresh."))
-      .finally(() => setLoading(false));
+    loadTenders();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, category, authority, awardFilter, sortBy]);
 
   const filtered = useMemo(() => {
     let result = [...tenders];
@@ -115,6 +138,12 @@ function ArchivesContent() {
     return result;
   }, [tenders, search, category, authority, awardFilter, sortBy]);
 
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pageStart = (currentPage - 1) * PAGE_SIZE;
+  const pageEnd = Math.min(pageStart + PAGE_SIZE, filtered.length);
+  const pageRows = filtered.slice(pageStart, pageEnd);
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Sidebar />
@@ -142,7 +171,9 @@ function ArchivesContent() {
             {SORT_OPTIONS.map((s) => (<option key={s}>{s}</option>))}
           </select>
           <span className="text-sm text-gray-400 ml-auto">
-            {filtered.length} of {tenders.length} archived
+            {filtered.length === 0
+              ? `0 of ${tenders.length} archived`
+              : `Showing ${pageStart + 1}\u2013${pageEnd} of ${filtered.length}${filtered.length !== tenders.length ? ` (filtered from ${tenders.length})` : ""}`}
           </span>
         </div>
       </div>
@@ -153,7 +184,15 @@ function ArchivesContent() {
             {[...Array(8)].map((_, i) => (<div key={i} className="h-12 bg-gray-100 rounded animate-pulse" />))}
           </div>
         ) : error ? (
-          <div className="text-center py-16 text-red-600">{error}</div>
+          <div className="text-center py-16">
+            <div className="text-red-600 mb-3">{error}</div>
+            <button
+              onClick={loadTenders}
+              className="bg-[#0D1F3C] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#162d52] transition-colors"
+            >
+              Retry
+            </button>
+          </div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-16 text-gray-400">No archived tenders match your filters</div>
         ) : (
@@ -173,7 +212,7 @@ function ArchivesContent() {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {filtered.map((t) => (
+                {pageRows.map((t) => (
                   <tr
                     key={t.nitNumber}
                     onClick={() => router.push(`/tender/${encodeURIComponent(t.nitNumber)}`)}
@@ -218,6 +257,42 @@ function ArchivesContent() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {!loading && !error && totalPages > 1 && (
+          <div className="flex items-center justify-between mt-4 text-sm">
+            <div className="text-gray-500">Page {currentPage} of {totalPages}</div>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setPage(1)}
+                disabled={currentPage === 1}
+                className="px-3 py-1.5 rounded border border-gray-300 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                &laquo; First
+              </button>
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1.5 rounded border border-gray-300 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Prev
+              </button>
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1.5 rounded border border-gray-300 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
+              <button
+                onClick={() => setPage(totalPages)}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1.5 rounded border border-gray-300 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Last &raquo;
+              </button>
+            </div>
           </div>
         )}
       </div>
