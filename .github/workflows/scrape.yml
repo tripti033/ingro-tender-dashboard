@@ -38,3 +38,7 @@ jobs:
 
       - name: Run BESS tender scraper
         run: node scraper/index.js
+
+      - name: Generate company merge suggestions
+        run: node scraper/suggest-merges.js
+        continue-on-error: true

@@ -406,3 +406,90 @@ export async function getBidsByTender(tenderNit: string): Promise<Bid[]> {
   const snapshot = await getDocs(q);
   return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as Bid);
 }
+
+// ── Merge Suggestions ──
+
+export interface MergeSuggestionMember {
+  id: string;
+  name: string;
+  bidsWon: number;
+  bidsLost: number;
+  totalCapacityMWh: number;
+}
+
+export interface MergeSuggestion {
+  id: string;
+  normalizedKey: string;
+  companyIds: string[];
+  companies: MergeSuggestionMember[];
+  suggestedCanonicalId: string;
+  status: "pending" | "approved" | "rejected";
+  createdAt: Timestamp | null;
+  resolvedAt?: Timestamp | null;
+}
+
+export async function getMergeSuggestions(status: "pending" | "approved" | "rejected" = "pending"): Promise<MergeSuggestion[]> {
+  const q = query(collection(db, "merge_suggestions"), where("status", "==", status));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as MergeSuggestion);
+}
+
+export async function rejectMerge(suggestionId: string) {
+  await updateDoc(doc(db, "merge_suggestions", suggestionId), {
+    status: "rejected",
+    resolvedAt: Timestamp.now(),
+  });
+}
+
+/**
+ * Merge source companies into the canonical one.
+ * - Reassigns all bids from source companies to canonical
+ * - Recomputes canonical's bidsWon/bidsLost/totalCapacityMWh from all bids
+ * - Reassigns contacts from source companies to canonical
+ * - Deletes source company docs
+ * - Marks suggestion approved
+ */
+export async function approveMerge(suggestionId: string, canonicalId: string, sourceIds: string[]) {
+  const canonicalSnap = await getDoc(doc(db, "companies", canonicalId));
+  if (!canonicalSnap.exists()) throw new Error(`Canonical company ${canonicalId} not found`);
+  const canonical = canonicalSnap.data() as Company;
+
+  // Reassign bids
+  for (const sid of sourceIds) {
+    if (sid === canonicalId) continue;
+    const bidsSnap = await getDocs(query(collection(db, "bids"), where("companyId", "==", sid)));
+    for (const b of bidsSnap.docs) {
+      await updateDoc(b.ref, { companyId: canonicalId, companyName: canonical.name });
+    }
+    const contactsSnap = await getDocs(query(collection(db, "contacts"), where("companyId", "==", sid)));
+    for (const c of contactsSnap.docs) {
+      await updateDoc(c.ref, { companyId: canonicalId, companyName: canonical.name });
+    }
+  }
+
+  // Recompute canonical's stats from all remaining bids
+  const allBidsSnap = await getDocs(query(collection(db, "bids"), where("companyId", "==", canonicalId)));
+  let bidsWon = 0, bidsLost = 0, totalCapacityMWh = 0;
+  for (const b of allBidsSnap.docs) {
+    const bid = b.data() as Bid;
+    if (bid.result === "won") {
+      bidsWon++;
+      totalCapacityMWh += bid.capacityMWh || 0;
+    } else if (bid.result === "lost") {
+      bidsLost++;
+    }
+  }
+  await updateDoc(doc(db, "companies", canonicalId), { bidsWon, bidsLost, totalCapacityMWh });
+
+  // Delete source companies
+  for (const sid of sourceIds) {
+    if (sid === canonicalId) continue;
+    await deleteDoc(doc(db, "companies", sid));
+  }
+
+  await updateDoc(doc(db, "merge_suggestions", suggestionId), {
+    status: "approved",
+    resolvedAt: Timestamp.now(),
+    finalCanonicalId: canonicalId,
+  });
+}

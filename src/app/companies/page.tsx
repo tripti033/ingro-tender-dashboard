@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { getCompanies, addCompany, type Company } from "@/lib/firestore";
+import { getCompanies, addCompany, getMergeSuggestions, type Company } from "@/lib/firestore";
 import AuthGuard from "@/components/AuthGuard";
 import Sidebar from "@/components/Sidebar";
 
@@ -29,6 +29,7 @@ function CompaniesContent() {
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({ name: "", type: "Developer" as "Developer" | "Board" | "Private" | "Other" });
   const [saving, setSaving] = useState(false);
+  const [pendingMerges, setPendingMerges] = useState(0);
 
   const handleAdd = async () => {
     if (!form.name.trim()) return;
@@ -45,6 +46,7 @@ function CompaniesContent() {
 
   useEffect(() => {
     getCompanies().then(setCompanies).finally(() => setLoading(false));
+    getMergeSuggestions("pending").then((s) => setPendingMerges(s.length)).catch(() => {});
   }, []);
 
   const filtered = useMemo(() => {
@@ -77,6 +79,19 @@ function CompaniesContent() {
             {showAdd ? "Cancel" : "+ Add Company"}
           </button>
         </div>
+
+        {pendingMerges > 0 && (
+          <button
+            onClick={() => router.push("/companies/merges")}
+            className="w-full mb-4 bg-amber-50 border border-amber-200 text-amber-900 rounded-lg px-4 py-3 text-sm flex items-center justify-between hover:bg-amber-100 transition-colors"
+          >
+            <span>
+              <strong>{pendingMerges}</strong> possible duplicate group{pendingMerges === 1 ? "" : "s"} detected.
+              <span className="text-amber-700"> Review and merge &rarr;</span>
+            </span>
+            <span className="text-amber-600">&rarr;</span>
+          </button>
+        )}
 
         {showAdd && (
           <div className="bg-white rounded-lg border p-5 mb-4">
