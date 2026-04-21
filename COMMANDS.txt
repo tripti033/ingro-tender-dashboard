@@ -50,6 +50,23 @@
 
 
 ───────────────────────────────────────────────────────────────────
+  3b. HISTORICAL BACKFILL (Gemini + Google Search)
+───────────────────────────────────────────────────────────────────
+
+  # Find BESS tenders floated during a date range (one Gemini call per month)
+  node scraper/backfill-tenders.js 2023-06 2023-09        # Jun–Sep 2023
+  node scraper/backfill-tenders.js 2024-01 2024-12        # full 2024
+  node scraper/backfill-tenders.js 2023-06 2023-06 --dry  # preview only, no write
+
+  Tenders found are written with source=["backfill"] and tenderStatus
+  inferred ("awarded" if Gemini returned a winner, else "closed").
+  They show up on /archives since they're historical.
+
+  Tip: always preview with --dry first. Gemini can return different
+  numbers of results each call.
+
+
+───────────────────────────────────────────────────────────────────
   4. COMPANY MERGE SUGGESTIONS
 ───────────────────────────────────────────────────────────────────
 
