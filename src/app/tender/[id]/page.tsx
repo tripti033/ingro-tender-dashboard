@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { type User } from "firebase/auth";
 import { doc, getDoc, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -151,10 +151,33 @@ function Section({ title, children, action }: { title: string; children: React.R
 
 // ── Main Component ──
 
+// Whitelist of safe back destinations so a ?from= param can't be abused
+// to redirect off-site. Also used to pick a human label for the back link.
+const BACK_DESTINATIONS: { prefix: string; label: string }[] = [
+  { prefix: "/archives", label: "Archives" },
+  { prefix: "/authority/", label: "Authority" },
+  { prefix: "/employee/", label: "Employee" },
+  { prefix: "/company/", label: "Company" },
+  { prefix: "/calendar", label: "Calendar" },
+  { prefix: "/alerts", label: "Alerts" },
+  { prefix: "/activity", label: "Activity" },
+  { prefix: "/dashboard", label: "All Tenders" },
+];
+
+function resolveBack(from: string | null): { href: string; label: string } {
+  if (from) {
+    const match = BACK_DESTINATIONS.find((d) => from.startsWith(d.prefix));
+    if (match) return { href: from, label: match.label === "All Tenders" ? "All Tenders" : `Back to ${match.label}` };
+  }
+  return { href: "/dashboard", label: "All Tenders" };
+}
+
 function TenderDetailContent() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const id = decodeURIComponent(params.id as string);
+  const back = resolveBack(searchParams.get("from"));
 
   const [user, setUser] = useState<User | null>(null);
   const [tender, setTender] = useState<Tender | null>(null);
@@ -373,7 +396,7 @@ function TenderDetailContent() {
 
   if (error || !tender) return (
     <div className="min-h-screen bg-gray-50"><Sidebar /><div className="sidebar-content max-w-4xl mx-auto px-6 py-12">
-      <button onClick={() => router.push("/dashboard")} className="text-[#0D1F3C] hover:underline text-sm mb-6">&larr; All Tenders</button>
+      <button onClick={() => router.push(back.href)} className="text-[#0D1F3C] hover:underline text-sm mb-6">&larr; {back.label}</button>
       <p className="text-red-600">{error || "Tender not found."}</p>
     </div></div>
   );
@@ -385,7 +408,7 @@ function TenderDetailContent() {
       <Sidebar />
       <div className="sidebar-content max-w-7xl mx-auto px-6 py-6">
         <div className="flex items-center justify-between mb-4">
-          <button onClick={() => router.push("/dashboard")} className="text-[#0D1F3C] hover:underline text-sm">&larr; All Tenders</button>
+          <button onClick={() => router.push(back.href)} className="text-[#0D1F3C] hover:underline text-sm">&larr; {back.label}</button>
           {!editing ? (
             <button onClick={startEditing} className="bg-[#0D1F3C] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#162d52] transition-colors">
               Edit Tender

@@ -161,7 +161,7 @@ function CalendarContent() {
                     <div className="space-y-0.5">
                       {dayEvents.slice(0, 3).map((e, j) => (
                         <button key={j}
-                          onClick={() => router.push(`/tender/${encodeURIComponent(e.tender.nitNumber)}`)}
+                          onClick={() => router.push(`/tender/${encodeURIComponent(e.tender.nitNumber)}?from=/calendar`)}
                           className={`w-full text-left px-1.5 py-0.5 rounded text-[10px] leading-tight border truncate ${e.color} hover:opacity-80 transition-opacity`}
                           title={`${e.label}: ${e.tender.title}`}>
                           {e.label.split(" ")[0]}: {(e.tender.authority || "").slice(0, 8)} {e.tender.powerMW ? `${e.tender.powerMW}MW` : ""}
@@ -187,7 +187,7 @@ function CalendarContent() {
               .sort((a, b) => a.date.getTime() - b.date.getTime())
               .slice(0, 10)
               .map((e, i) => (
-                <div key={i} onClick={() => router.push(`/tender/${encodeURIComponent(e.tender.nitNumber)}`)}
+                <div key={i} onClick={() => router.push(`/tender/${encodeURIComponent(e.tender.nitNumber)}?from=/calendar`)}
                   className="bg-white rounded-lg border px-4 py-3 flex items-center gap-4 hover:shadow-sm cursor-pointer transition-shadow">
                   <div className={`px-2 py-1 rounded text-xs font-medium border ${e.color}`}>{e.label}</div>
                   <div className="flex-1 min-w-0">

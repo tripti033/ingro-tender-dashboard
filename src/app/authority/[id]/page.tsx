@@ -155,7 +155,7 @@ function AuthorityDetailContent() {
                   {visible.map((t) => {
                     const status = statusLabel(t);
                     const days = liveDaysLeft(t);
-                    const href = `/tender/${encodeURIComponent(t.nitNumber)}`;
+                    const href = `/tender/${encodeURIComponent(t.nitNumber)}?from=${encodeURIComponent(`/authority/${encodeURIComponent(authorityId)}`)}`;
                     return (
                       <tr
                         key={t.nitNumber}

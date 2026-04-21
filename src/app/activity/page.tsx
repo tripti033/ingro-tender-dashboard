@@ -93,7 +93,7 @@ function ActivityContent() {
                           </div>
                           {a.tenderNit && (
                             <button
-                              onClick={() => router.push(`/tender/${encodeURIComponent(a.tenderNit!)}`)}
+                              onClick={() => router.push(`/tender/${encodeURIComponent(a.tenderNit!)}?from=/activity`)}
                               className="text-xs text-[#0D1F3C] hover:underline mt-0.5 truncate block max-w-full"
                             >
                               {a.tenderTitle?.slice(0, 60) || a.tenderNit}

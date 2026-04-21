@@ -226,7 +226,7 @@ function ArchivesContent() {
                 {pageRows.map((t) => (
                   <tr
                     key={t.nitNumber}
-                    onClick={() => router.push(`/tender/${encodeURIComponent(t.nitNumber)}`)}
+                    onClick={() => router.push(`/tender/${encodeURIComponent(t.nitNumber)}?from=/archives`)}
                     className="hover:bg-gray-50 cursor-pointer transition-colors text-gray-600"
                   >
                     <td className="px-3 py-2.5 font-mono text-xs whitespace-nowrap" title={t.nitNumber}>
