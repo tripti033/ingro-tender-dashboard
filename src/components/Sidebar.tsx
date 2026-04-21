@@ -114,13 +114,13 @@ export default function Sidebar() {
         }`}
       >
         {/* Logo + reminder bell + collapse toggle */}
-        <div className="flex items-center justify-between border-b border-white/10 px-3 py-4 gap-2">
+        <div className={`border-b border-white/10 px-3 py-4 ${collapsed ? "flex flex-col items-center gap-2" : "flex items-center justify-between gap-2"}`}>
           {!collapsed && (
             <div className="cursor-pointer overflow-hidden flex-1 min-w-0" onClick={() => router.push("/dashboard")}>
               <img src="/logo-white.png" alt="Ingro Energy" className="h-7" />
             </div>
           )}
-          <div className="flex items-center gap-1 shrink-0">
+          <div className={`flex items-center gap-1 shrink-0 ${collapsed ? "flex-col" : ""}`}>
             <ReminderBell collapsed={collapsed} />
             <button
               onClick={() => setCollapsed(!collapsed)}
