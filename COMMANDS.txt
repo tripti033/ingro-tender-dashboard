@@ -81,6 +81,17 @@
 
 
 ───────────────────────────────────────────────────────────────────
+  3d. FAKE CONTACT CLEANUP
+───────────────────────────────────────────────────────────────────
+
+  # Null out obvious placeholder contact fields (abc@..., 1234567890,
+  # "John Doe" etc.) from all existing tenders. Pure pattern match,
+  # no PDF re-fetch.
+  node scraper/clean-fake-contacts.js --dry   # preview
+  node scraper/clean-fake-contacts.js         # apply
+
+
+───────────────────────────────────────────────────────────────────
   4. COMPANY MERGE SUGGESTIONS
 ───────────────────────────────────────────────────────────────────
 
