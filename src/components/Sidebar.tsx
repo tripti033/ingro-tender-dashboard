@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { type User } from "firebase/auth";
 import { onAuthChange, signOut } from "@/lib/auth";
 import { useRouter, usePathname } from "next/navigation";
+import ReminderBell from "./ReminderBell";
 
 // SVG icon components — clean, consistent Heroicons-style
 function IconTenders({ className }: { className?: string }) {
@@ -112,22 +113,25 @@ export default function Sidebar() {
           collapsed ? "w-16" : "w-56"
         }`}
       >
-        {/* Logo + collapse toggle */}
-        <div className="flex items-center justify-between border-b border-white/10 px-3 py-4">
+        {/* Logo + reminder bell + collapse toggle */}
+        <div className="flex items-center justify-between border-b border-white/10 px-3 py-4 gap-2">
           {!collapsed && (
-            <div className="cursor-pointer overflow-hidden" onClick={() => router.push("/dashboard")}>
+            <div className="cursor-pointer overflow-hidden flex-1 min-w-0" onClick={() => router.push("/dashboard")}>
               <img src="/logo-white.png" alt="Ingro Energy" className="h-7" />
             </div>
           )}
-          <button
-            onClick={() => setCollapsed(!collapsed)}
-            className="text-gray-400 hover:text-white p-1.5 rounded hover:bg-white/10 transition-colors"
-            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          >
-            <svg className={`w-4 h-4 transition-transform ${collapsed ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
-            </svg>
-          </button>
+          <div className="flex items-center gap-1 shrink-0">
+            <ReminderBell collapsed={collapsed} />
+            <button
+              onClick={() => setCollapsed(!collapsed)}
+              className="text-gray-400 hover:text-white p-1.5 rounded hover:bg-white/10 transition-colors"
+              title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            >
+              <svg className={`w-4 h-4 transition-transform ${collapsed ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         {/* Nav items */}
