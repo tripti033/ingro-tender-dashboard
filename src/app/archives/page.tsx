@@ -236,6 +236,9 @@ function ArchivesContent() {
                       <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${authorityColor(t.authority)}`}>
                         {t.authority || "\u2014"}
                       </span>
+                      {t.isCorrigendum && (
+                        <span className="ml-1 inline-block bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded-full text-[10px] font-bold" title="Corrigendum">CORR</span>
+                      )}
                     </td>
                     <td className="px-3 py-2.5">
                       <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${categoryColor(t.category)}`}>

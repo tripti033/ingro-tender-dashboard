@@ -78,6 +78,11 @@ export interface Tender {
   awardedTo: string | null;        // Company that won the bid
   developedBy: string | null;      // Company that develops/executes
 
+  // Corrigendum linkage
+  isCorrigendum: boolean | null;    // true if this row is itself a corrigendum
+  corrigendumOf: string | null;     // NIT of the parent tender this amends
+  corrigendumCount: number | null;  // on parent: how many corrigenda have been issued
+
   // Read tracking (per user)
   readBy: Record<string, number> | null;  // { uid: timestamp_ms }
 
@@ -537,4 +542,35 @@ export async function approveMerge(suggestionId: string, canonicalId: string, so
       description: `merged ${preview} into "${canonical.name}"`,
     });
   }
+}
+
+// ── Corrigenda (amendments to tenders) ──
+
+export interface CorrigendumDiffEntry {
+  field: string;
+  from: unknown;
+  to: unknown;
+}
+
+export interface CorrigendumRecord {
+  id: string;
+  parentNit: string;
+  childNit: string;           // NIT of the corrigendum row itself
+  title: string;
+  issuedAt: Timestamp | null; // date the corrigendum was issued
+  documentLink: string | null;
+  source: string | null;
+  // Level 3: diff log
+  summary: string | null;         // LLM-generated plain-language summary
+  changes: CorrigendumDiffEntry[]; // concrete field deltas
+  extractedAt: Timestamp | null;
+}
+
+export async function getCorrigenda(parentNit: string): Promise<CorrigendumRecord[]> {
+  const q = query(
+    collection(db, "tenders", parentNit, "corrigenda"),
+    orderBy("issuedAt", "desc"),
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as CorrigendumRecord);
 }

@@ -6,7 +6,7 @@ import { type User } from "firebase/auth";
 import { doc, getDoc, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { onAuthChange } from "@/lib/auth";
-import { updateFlag, updateNote, updateTender, getEditHistory, getBidsByTender, getEmployees, type Tender, type EditHistoryEntry, type Bid, type Employee } from "@/lib/firestore";
+import { updateFlag, updateNote, updateTender, getEditHistory, getBidsByTender, getEmployees, getCorrigenda, type Tender, type EditHistoryEntry, type Bid, type Employee, type CorrigendumRecord } from "@/lib/firestore";
 import AuthGuard from "@/components/AuthGuard";
 import Sidebar from "@/components/Sidebar";
 
@@ -194,6 +194,7 @@ function TenderDetailContent() {
   const [editHistory, setEditHistory] = useState<EditHistoryEntry[]>([]);
   const [tenderBids, setTenderBids] = useState<Bid[]>([]);
   const [employeeNames, setEmployeeNames] = useState<string[]>([]);
+  const [corrigenda, setCorrigenda] = useState<CorrigendumRecord[]>([]);
 
   // Flag & note
   const [selectedFlag, setSelectedFlag] = useState("");
@@ -204,11 +205,12 @@ function TenderDetailContent() {
 
   useEffect(() => { return onAuthChange(setUser); }, []);
 
-  // Load edit history, bids, and employees
+  // Load edit history, bids, corrigenda, and employees
   useEffect(() => {
     if (id) {
       getEditHistory(id).then(setEditHistory).catch(() => {});
       getBidsByTender(id).then(setTenderBids).catch(() => {});
+      getCorrigenda(id).then(setCorrigenda).catch(() => {});
     }
     getEmployees().then((emps) => setEmployeeNames(emps.map((e) => e.name))).catch(() => {});
   }, [id]);
@@ -467,6 +469,65 @@ function TenderDetailContent() {
           <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-5">
             <h2 className="text-xs font-semibold text-blue-600 uppercase tracking-wider mb-2">AI Summary</h2>
             <p className="text-sm text-gray-700 leading-relaxed">{t.summary}</p>
+          </div>
+        )}
+
+        {/* If this tender is itself a corrigendum, link to the parent */}
+        {t.isCorrigendum && t.corrigendumOf && (
+          <div className="mb-6 bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-center justify-between">
+            <div>
+              <span className="inline-block bg-amber-200 text-amber-900 text-xs font-bold px-2 py-0.5 rounded-full mr-2">CORRIGENDUM</span>
+              <span className="text-sm text-amber-900">This is an amendment to an earlier tender.</span>
+            </div>
+            <button
+              onClick={() => router.push(`/tender/${encodeURIComponent(t.corrigendumOf!)}`)}
+              className="text-sm text-amber-900 hover:underline font-medium whitespace-nowrap"
+            >
+              View parent &rarr;
+            </button>
+          </div>
+        )}
+
+        {/* Corrigenda issued against this tender */}
+        {corrigenda.length > 0 && (
+          <div className="mb-6 bg-white border rounded-lg p-5">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Corrigenda ({corrigenda.length})</h2>
+            </div>
+            <div className="space-y-3">
+              {corrigenda.map((c) => (
+                <div key={c.id} className="border-l-2 border-amber-300 pl-3 py-1">
+                  <div className="flex items-start justify-between gap-3 mb-1">
+                    <div className="text-sm font-medium text-gray-900">{c.title}</div>
+                    <span className="text-xs text-gray-400 whitespace-nowrap">
+                      {c.issuedAt && typeof c.issuedAt.toDate === "function"
+                        ? c.issuedAt.toDate().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+                        : "\u2014"}
+                    </span>
+                  </div>
+                  {c.summary && (
+                    <p className="text-sm text-gray-700 leading-relaxed mb-1">{c.summary}</p>
+                  )}
+                  {c.changes && c.changes.length > 0 && (
+                    <ul className="text-xs text-gray-600 space-y-0.5 mb-1 font-mono">
+                      {c.changes.map((ch, i) => (
+                        <li key={i}>
+                          <span className="text-gray-500">{ch.field}:</span>{" "}
+                          <span className="text-red-600 line-through">{String(ch.from ?? "\u2014")}</span>
+                          {" \u2192 "}
+                          <span className="text-green-700">{String(ch.to ?? "\u2014")}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {c.documentLink && (
+                    <a href={c.documentLink} target="_blank" rel="noopener noreferrer" className="text-xs text-[#0D1F3C] hover:underline">
+                      View document &rarr;
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

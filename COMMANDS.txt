@@ -67,6 +67,20 @@
 
 
 ───────────────────────────────────────────────────────────────────
+  3c. CORRIGENDUM DIFFS (LLM extracts what changed)
+───────────────────────────────────────────────────────────────────
+
+  # Diff every corrigendum vs its parent (writes summary + changes)
+  node scraper/diff-corrigenda.js
+
+  # Re-diff even corrigenda already processed (after prompt tweaks)
+  node scraper/diff-corrigenda.js --retry
+
+  # Only diff corrigenda under a specific parent NIT
+  node scraper/diff-corrigenda.js SECI-2025-TN000011
+
+
+───────────────────────────────────────────────────────────────────
   4. COMPANY MERGE SUGGESTIONS
 ───────────────────────────────────────────────────────────────────
 

@@ -6,6 +6,7 @@ import {
   setDoc,
   updateDoc,
   collection,
+  getDocs,
   addDoc,
   Timestamp,
 } from "firebase/firestore";
@@ -13,6 +14,7 @@ import {
   getAuth,
   signInWithEmailAndPassword,
 } from "firebase/auth";
+import { findParentNit } from "./corrigendum.js";
 
 let db = null;
 let authenticated = false;
@@ -81,12 +83,90 @@ export async function writeTenders(tenders) {
   let newCount = 0;
   let updatedCount = 0;
   let skippedCount = 0;
+  let corrigendaLinked = 0;
   const errors = [];
+
+  // One-time load of every existing tender so we can resolve parent NITs for
+  // corrigenda that don't self-declare their parent. We only pull the handful
+  // of fields needed for fuzzy matching.
+  const existingSnap = await getDocs(collection(db, "tenders"));
+  const existingLite = existingSnap.docs.map((d) => {
+    const t = d.data();
+    return {
+      nitNumber: d.id,
+      title: t.title || "",
+      authority: t.authority || null,
+      powerMW: t.powerMW ?? null,
+      energyMWh: t.energyMWh ?? null,
+      isCorrigendum: !!t.isCorrigendum,
+    };
+  });
 
   for (const tender of tenders) {
     try {
+      // Resolve corrigendum → parent link. If source didn't set corrigendumOf,
+      // try fuzzy match against the known existing tenders (+ other rows
+      // already seen in this batch).
+      if (tender.isCorrigendum && !tender.corrigendumOf) {
+        const pool = existingLite.concat(
+          tenders
+            .filter((t) => t !== tender && !t.isCorrigendum)
+            .map((t) => ({
+              nitNumber: t.nitNumber, title: t.title || "",
+              authority: t.authority || null, powerMW: t.powerMW ?? null,
+              energyMWh: t.energyMWh ?? null, isCorrigendum: false,
+            })),
+        );
+        tender.corrigendumOf = findParentNit(tender, pool);
+      }
+
       const docRef = doc(db, "tenders", tender.nitNumber);
       const docSnap = await getDoc(docRef);
+
+      // Mirror the corrigendum into the parent's subcollection + push a new
+      // deadline up if one was issued.
+      if (tender.isCorrigendum && tender.corrigendumOf) {
+        try {
+          const parentRef = doc(db, "tenders", tender.corrigendumOf);
+          const parentSnap = await getDoc(parentRef);
+          if (parentSnap.exists()) {
+            const parent = parentSnap.data();
+            const corrRef = doc(collection(parentRef, "corrigenda"), tender.nitNumber);
+            await setDoc(corrRef, {
+              parentNit: tender.corrigendumOf,
+              childNit: tender.nitNumber,
+              title: tender.title,
+              issuedAt: tender.firstSeenAt || now,
+              bidDeadline: tender.bidDeadline || null,
+              emdDeadline: tender.emdDeadline || null,
+              documentLink: tender.documentLink || null,
+              source: (tender.sources || [])[0] || null,
+              summary: null,
+              changes: [],
+              extractedAt: null,
+            }, { merge: true });
+
+            // If the corrigendum has a newer deadline than the parent, adopt it
+            const parentDl = parent.bidDeadline;
+            const newDl = tender.bidDeadline;
+            if (newDl && (!parentDl || (newDl.toMillis && parentDl.toMillis && newDl.toMillis() > parentDl.toMillis()))) {
+              await updateDoc(parentRef, {
+                bidDeadline: newDl,
+                lastUpdatedAt: now,
+                corrigendumCount: (parent.corrigendumCount || 0) + 1,
+              });
+            } else {
+              await updateDoc(parentRef, {
+                corrigendumCount: (parent.corrigendumCount || 0) + 1,
+                lastUpdatedAt: now,
+              });
+            }
+            corrigendaLinked++;
+          }
+        } catch (err) {
+          console.log(`[Corrigendum] failed to link ${tender.nitNumber} → ${tender.corrigendumOf}: ${err.message}`);
+        }
+      }
 
       if (!docSnap.exists()) {
         // New tender — write full document
@@ -135,6 +215,8 @@ export async function writeTenders(tenders) {
           "documents",
           "preBidLink",
           "sourceUrl",
+          "isCorrigendum",
+          "corrigendumOf",
         ];
 
         let hasChanges = false;
@@ -167,10 +249,10 @@ export async function writeTenders(tenders) {
   }
 
   console.log(
-    `[Firestore] New: ${newCount}, Updated: ${updatedCount}, Skipped: ${skippedCount}, Errors: ${errors.length}`
+    `[Firestore] New: ${newCount}, Updated: ${updatedCount}, Skipped: ${skippedCount}, Corrigenda linked: ${corrigendaLinked}, Errors: ${errors.length}`
   );
 
-  return { newCount, updatedCount, skippedCount, errors };
+  return { newCount, updatedCount, skippedCount, corrigendaLinked, errors };
 }
 
 /**

@@ -1,5 +1,6 @@
 import { Timestamp } from "./firestore.js";
 import { extractTenderFields, isLlmAvailable } from "./llm.js";
+import { isCorrigendum as detectCorrigendum } from "./corrigendum.js";
 
 /**
  * Parse a date string in various formats into a JS Date object.
@@ -229,6 +230,13 @@ export function normaliseToSchema(rawTender, source) {
     notes: {},
     firstSeenAt: Timestamp.now(),
     lastUpdatedAt: Timestamp.now(),
+    // Corrigendum fields. Scrapers that know their own schema (e.g. TenderWizard)
+    // pre-fill these; otherwise we detect from title. Parent NIT is resolved
+    // later by the writer which has access to the full existing dataset.
+    isCorrigendum: rawTender.isCorrigendum != null
+      ? !!rawTender.isCorrigendum
+      : detectCorrigendum(title, nitNumber),
+    corrigendumOf: rawTender.corrigendumOf || null,
   };
 }
 
