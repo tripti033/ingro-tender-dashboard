@@ -165,12 +165,26 @@ async function main() {
     }
 
     // ── Step 2: PDF extraction (if --pdf flag) ──
+    // Run PDF extraction if the tender has a documentLink AND at least one
+    // PDF-extractable field is still missing. Previously this was gated on
+    // !minimumBidSize which blocked re-runs once the first field was filled,
+    // preventing contact details (often in later pages) from ever being
+    // extracted.
+    const PDF_FIELDS = [
+      "minimumBidSize", "maxAllocationPerBidder", "gridConnected",
+      "roundTripEfficiency", "minimumAnnualAvailability", "dailyCycles",
+      "financialClosure", "scodMonths", "gracePeriod",
+      "tenderProcessingFee", "tenderDocumentFee", "vgfAmount",
+      "emdAmount", "pbgAmount", "successCharges", "paymentSecurityFund",
+      "portalRegistrationFee", "biddingStructure", "bespaSigning",
+      "connectivityType", "contactPerson", "contactEmail", "contactPhone",
+      "bidSubmissionOnline", "bidSubmissionOffline", "bidOpeningDate",
+    ];
+    const hasPdfGaps = PDF_FIELDS.some((f) => tender[f] == null);
+    let pdfRan = false;
 
-    if (
-      doPdf &&
-      tender.documentLink &&
-      !tender.minimumBidSize
-    ) {
+    if (doPdf && tender.documentLink && hasPdfGaps) {
+      pdfRan = true;
       console.log(`\n${YELLOW}From PDF:${RESET} ${tender.documentLink.slice(0, 80)}`);
 
       const pdfUpdates = await enrichFromPdf(tender);
@@ -186,19 +200,29 @@ async function main() {
       } else {
         console.log(`  ${DIM}(no new fields extracted from PDF)${RESET}`);
       }
+    } else if (doPdf && tender.documentLink && !hasPdfGaps) {
+      console.log(`  ${DIM}(skipping PDF — all PDF fields already filled)${RESET}`);
     }
 
     // ── Step 3: Approval ──
 
     if (!hasChanges) {
-      console.log(`  ${DIM}(no changes to make — marking llmExtractionFailed)${RESET}`);
-      try {
-        await updateDoc(doc(db, "tenders", tender.nitNumber), {
-          llmExtractionFailed: true,
-          llmExtractionAttemptedAt: Timestamp.now(),
-        });
-      } catch (err) {
-        console.log(`  ${RED}Failed-flag write failed: ${err.message}${RESET}`);
+      // Only mark as "LLM-failed" if we actually invoked the LLM on content.
+      // If we skipped because all fields are already filled, the tender is
+      // complete — don't penalise it on future runs.
+      const actuallyRan = !!llmFields || pdfRan;
+      if (actuallyRan) {
+        console.log(`  ${DIM}(no new fields — marking llmExtractionFailed)${RESET}`);
+        try {
+          await updateDoc(doc(db, "tenders", tender.nitNumber), {
+            llmExtractionFailed: true,
+            llmExtractionAttemptedAt: Timestamp.now(),
+          });
+        } catch (err) {
+          console.log(`  ${RED}Failed-flag write failed: ${err.message}${RESET}`);
+        }
+      } else {
+        console.log(`  ${DIM}(all fields already filled — skipping)${RESET}`);
       }
       skipped++;
       continue;
