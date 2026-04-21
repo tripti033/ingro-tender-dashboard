@@ -74,17 +74,28 @@ function ArchivesContent() {
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 50;
 
+  const isArchived = (t: Tender) => {
+    // Include tenders that are closed, awarded, cancelled, OR whose
+    // deadline has passed (even if the status field is stale).
+    if (t.tenderStatus === "closed" || t.tenderStatus === "awarded" || t.tenderStatus === "cancelled") return true;
+    if (!t.bidDeadline) return false;
+    try {
+      const d = typeof t.bidDeadline.toDate === "function" ? t.bidDeadline.toDate() : new Date(t.bidDeadline as unknown as string);
+      return d.getTime() < Date.now();
+    } catch { return false; }
+  };
+
   const loadTenders = async () => {
     setLoading(true);
     setError(null);
     try {
       const all = await getTenders();
-      setTenders(all.filter((t) => t.tenderStatus === "closed"));
+      setTenders(all.filter(isArchived));
     } catch {
       try {
         await new Promise((r) => setTimeout(r, 800));
         const all = await getTenders();
-        setTenders(all.filter((t) => t.tenderStatus === "closed"));
+        setTenders(all.filter(isArchived));
       } catch {
         setError("Failed to load archives.");
       }

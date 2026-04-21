@@ -148,8 +148,13 @@ function DashboardContent() {
   }, [search, category, authority, status, sortBy]);
 
   const filtered = useMemo(() => {
-    // Exclude both stale-closed and live-closed tenders (they belong in /archives)
-    let result = tenders.filter((t) => t.tenderStatus !== "closed" && liveStatus(t) !== "closed");
+    // Exclude anything that belongs in /archives: closed, awarded, cancelled,
+    // or whose deadline has passed (stale status field).
+    let result = tenders.filter((t) => {
+      if (t.tenderStatus === "closed" || t.tenderStatus === "awarded" || t.tenderStatus === "cancelled") return false;
+      if (liveStatus(t) === "closed") return false;
+      return true;
+    });
     if (search) {
       const q = search.toLowerCase();
       result = result.filter((t) =>
