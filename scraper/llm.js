@@ -235,16 +235,23 @@ export async function extractPdfFields(pdfText, tenderTitle = "") {
   ].join("\n---\n").slice(0, 8000); // 8K chars — sweet spot for 3B model speed + coverage
   console.log(`[LLM] PDF prompt: ${text.length} chars from ${chunks.size} key sections`);
 
-  const systemPrompt = `You are a data extraction assistant for Indian BESS (Battery Energy Storage System) bid documents. Extract structured fields from tender RfS/RfP document excerpts and respond ONLY with valid JSON. No explanation. Use null for missing values.`;
+  const systemPrompt = `You are a data extraction assistant for Indian BESS tender documents. You ONLY extract values that appear VERBATIM in the provided text. NEVER invent, guess, or fabricate values. If a value is not literally present in the text, return null for that field. Respond ONLY with valid JSON. No explanation.`;
 
   const prompt = `Extract fields from this Indian BESS tender document. Tender: "${tenderTitle}"
 
 Return a FLAT JSON object (no nesting) with these keys:
 minimumBidSize, maxAllocationPerBidder, gridConnected, roundTripEfficiency, minimumAnnualAvailability, dailyCycles, financialClosure, scodMonths, gracePeriod, tenderProcessingFee, tenderDocumentFee, vgfAmount, emdAmount, pbgAmount, successCharges, paymentSecurityFund, portalRegistrationFee, biddingStructure, bespaSigning, connectivityType, contactPerson, contactEmail, contactPhone, bidSubmissionOnline, bidSubmissionOffline, bidOpeningDate
 
-Rules: All amounts in INR as plain numbers. Strings for text fields. null if not found.
+CRITICAL RULES:
+- Only extract values that appear LITERALLY in the text below. Do NOT invent.
+- For contactEmail: must be an actual email address present in the text (not "abc@..." or "contact@example.com"). If no email is present, return null.
+- For contactPhone: must be an actual phone number present in the text. If none, return null.
+- For contactPerson: must be the actual name of a person mentioned in the text. If none, return null.
+- All amounts in INR as plain numbers. Strings for text fields. null if not found.
+- Better to return null than a guess. Hallucinated values will be rejected.
 
-Example: {"emdAmount": 5000000, "biddingStructure": "Two-Envelope + e-Reverse Auction", "roundTripEfficiency": ">=85%", "contactEmail": "abc@seci.co.in"}
+Example (shape only — your actual values must come from the text):
+{"emdAmount": 5000000, "biddingStructure": "Two-Envelope + e-Reverse Auction", "contactEmail": null, "contactPerson": null}
 
 Text:
 ${text}`;
@@ -256,12 +263,61 @@ ${text}`;
   const flat = {};
   for (const [key, value] of Object.entries(result)) {
     if (value && typeof value === "object" && !Array.isArray(value)) {
-      // Nested — flatten it
       for (const [innerKey, innerValue] of Object.entries(value)) {
         flat[innerKey] = innerValue;
       }
     } else {
       flat[key] = value;
+    }
+  }
+
+  // Contact-detail anti-hallucination guardrails. The 3B model likes to
+  // invent plausible-looking emails and phone numbers when the doc has none.
+  // Only keep contact values that (a) pass a format check and (b) actually
+  // appear verbatim somewhere in the PDF text.
+  const pdfLower = pdfText.toLowerCase();
+
+  if (flat.contactEmail) {
+    const email = String(flat.contactEmail).trim();
+    const emailRe = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+    const placeholders = /^(abc|test|example|contact|info|admin|dummy|xyz)@/i;
+    if (
+      !emailRe.test(email) ||
+      placeholders.test(email) ||
+      !pdfLower.includes(email.toLowerCase())
+    ) {
+      console.log(`[LLM] rejected fabricated contactEmail: ${email}`);
+      flat.contactEmail = null;
+    }
+  }
+
+  if (flat.contactPhone) {
+    const phone = String(flat.contactPhone).trim();
+    const digitsOnly = phone.replace(/\D/g, "");
+    // Also need to check the digits appear as a contiguous run in the source
+    const pdfDigits = pdfText.replace(/\D/g, "");
+    if (
+      digitsOnly.length < 8 ||
+      digitsOnly.length > 15 ||
+      /^(1234567890|0000000000|9999999999)$/.test(digitsOnly) ||
+      !pdfDigits.includes(digitsOnly)
+    ) {
+      console.log(`[LLM] rejected fabricated contactPhone: ${phone}`);
+      flat.contactPhone = null;
+    }
+  }
+
+  if (flat.contactPerson) {
+    const person = String(flat.contactPerson).trim();
+    // Reject generic placeholders + any name not appearing in the PDF
+    const placeholderName = /^(john doe|jane doe|mr\.?\s+x|contact person|the undersigned|n\.?a\.?|\-+)$/i;
+    if (
+      person.length < 3 ||
+      placeholderName.test(person) ||
+      !pdfLower.includes(person.toLowerCase())
+    ) {
+      console.log(`[LLM] rejected fabricated contactPerson: ${person}`);
+      flat.contactPerson = null;
     }
   }
 
