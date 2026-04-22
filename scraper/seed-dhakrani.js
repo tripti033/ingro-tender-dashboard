@@ -50,7 +50,9 @@ const data = {
   emdDeadline: Timestamp.fromDate(new Date("2026-02-28T12:00:00+05:30")),
   techBidOpeningDate: Timestamp.fromDate(new Date("2026-02-28T15:00:00+05:30")),
   financialBidOpeningDate: null,
-  bidOpeningDate: Timestamp.fromDate(new Date("2026-02-28T15:00:00+05:30")),
+  // bidOpeningDate / bidSubmission* are schema-defined as strings (they come
+  // verbatim from tender docs where the format varies), NOT Timestamps.
+  bidOpeningDate: "28-02-2026 15:00 hrs",
   bidSubmissionOnline: "25-02-2026 16:00 hrs",
   bidSubmissionOffline: "28-02-2026 12:00 hrs",
   // Financials

@@ -84,11 +84,30 @@ function StatusBadge({ status }: { status: string }) {
 
 // ── Display Row (view mode) ──
 
+// Firestore Timestamps are {seconds, nanoseconds} objects (with methods).
+// If one slips into <Row value=...>, React throws error #31 and the whole
+// page crashes. Safety net: auto-format any date-like value here so a
+// forgotten call-site can't take the page down.
+function safeRenderValue(v: React.ReactNode): React.ReactNode {
+  if (v == null || typeof v !== "object") return v;
+  const obj = v as { toDate?: () => Date; seconds?: number };
+  if (typeof obj.toDate === "function") {
+    try { return obj.toDate().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }); }
+    catch { return null; }
+  }
+  if (typeof obj.seconds === "number") {
+    try { return new Date(obj.seconds * 1000).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }); }
+    catch { return null; }
+  }
+  return v;
+}
+
 function Row({ label, value, highlight }: { label: string; value: React.ReactNode; highlight?: boolean }) {
+  const rendered = safeRenderValue(value);
   return (
     <div className={`flex justify-between py-2.5 border-b border-gray-100 ${highlight ? "bg-yellow-50 -mx-5 px-5" : ""}`}>
       <span className="text-gray-500 text-sm">{label}</span>
-      <span className="text-sm font-medium text-right max-w-[60%]">{value || "\u2014"}</span>
+      <span className="text-sm font-medium text-right max-w-[60%]">{rendered || "\u2014"}</span>
     </div>
   );
 }
