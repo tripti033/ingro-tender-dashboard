@@ -45,13 +45,25 @@ export default function ChecklistCard({
 }) {
   const [items, setItems] = useState<ChecklistItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [newItem, setNewItem] = useState({ bucket: "Custom" as ChecklistBucket, document: "", reference: "" });
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    getChecklist(tenderNit).then(setItems).finally(() => setLoading(false));
+    getChecklist(tenderNit)
+      .then((list) => { setItems(list); setError(null); })
+      .catch((err) => {
+        console.error("[Checklist] load failed:", err);
+        const msg = String(err?.code || err?.message || "");
+        if (msg.includes("permission-denied")) {
+          setError("Firestore rules don't allow this yet — add a rule for tenders/{nit}/checklist/{id}.");
+        } else {
+          setError("Couldn't load checklist. Try refresh.");
+        }
+      })
+      .finally(() => setLoading(false));
   }, [tenderNit]);
 
   const counts = useMemo(() => {
@@ -158,6 +170,10 @@ export default function ChecklistCard({
       {loading ? (
         <div className="space-y-2">
           {[...Array(4)].map((_, i) => <div key={i} className="h-10 bg-gray-100 rounded animate-pulse" />)}
+        </div>
+      ) : error ? (
+        <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm">
+          {error}
         </div>
       ) : items.length === 0 ? (
         <div className="text-center py-8">

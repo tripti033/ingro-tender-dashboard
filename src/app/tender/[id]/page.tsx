@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, Suspense } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { type User } from "firebase/auth";
 import { doc, getDoc, Timestamp } from "firebase/firestore";
@@ -830,5 +830,20 @@ function TenderDetailContent() {
 }
 
 export default function TenderDetailPage() {
-  return <AuthGuard><TenderDetailContent /></AuthGuard>;
+  // Suspense wraps TenderDetailContent because it calls useSearchParams(),
+  // which Next.js requires to sit inside a Suspense boundary.
+  return (
+    <AuthGuard>
+      <Suspense fallback={
+        <div className="min-h-screen bg-gray-50">
+          <Sidebar />
+          <div className="sidebar-content flex items-center justify-center py-32">
+            <div className="animate-spin rounded-full h-10 w-10 border-4 border-gray-200 border-t-[#0D1F3C]" />
+          </div>
+        </div>
+      }>
+        <TenderDetailContent />
+      </Suspense>
+    </AuthGuard>
+  );
 }
