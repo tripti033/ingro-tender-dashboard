@@ -67,6 +67,19 @@
 
 
 ───────────────────────────────────────────────────────────────────
+  3g. TENDERDETAIL PURGE (one-off, already done 2026-04)
+───────────────────────────────────────────────────────────────────
+
+  # Deletes tenders whose ONLY source is TenderDetail. For merged
+  # tenders, strips "TenderDetail" from sources without deleting.
+  node scraper/remove-tenderdetail.js --dry
+  node scraper/remove-tenderdetail.js
+
+  The TenderDetail source is also commented out in scraper/index.js
+  so it won't re-populate on the next scrape.
+
+
+───────────────────────────────────────────────────────────────────
   3f. CHECKLIST EXTRACTOR (Ollama reads RfP PDF -> checklist items)
 ───────────────────────────────────────────────────────────────────
 

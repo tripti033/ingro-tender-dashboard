@@ -10,7 +10,9 @@ import { scrapeIreda } from "./sources/ireda.js";
 import { scrapePowergrid } from "./sources/powergrid.js";
 import { scrapeUktenders } from "./sources/uktenders.js";
 import { scrapeHppcl } from "./sources/hppcl.js";
-import { scrapeTenderDetail } from "./sources/tenderdetail.js";
+// TenderDetail scraper retired 2026-04 — too much noise, duplicate coverage
+// of SECI/NTPC/etc. The file stays on disk in case we want to revisit it.
+// import { scrapeTenderDetail } from "./sources/tenderdetail.js";
 import { scrapeNgel } from "./sources/ngel.js";
 import { scrapeMeda } from "./sources/meda.js";
 import { scrapeTenderWizard } from "./sources/tenderwizard.js";
@@ -35,7 +37,7 @@ const SOURCES = [
   { name: "POWERGRID", fn: scrapePowergrid },
   { name: "uktenders", fn: scrapeUktenders },
   { name: "HPPCL", fn: scrapeHppcl },
-  { name: "TenderDetail", fn: scrapeTenderDetail },
+  // { name: "TenderDetail", fn: scrapeTenderDetail }, // retired — duplicate coverage + noisy data
   { name: "NGEL", fn: scrapeNgel },
   { name: "MEDA", fn: scrapeMeda },
   { name: "TenderWizard", fn: scrapeTenderWizard },
