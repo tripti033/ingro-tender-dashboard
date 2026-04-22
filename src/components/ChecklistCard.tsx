@@ -122,29 +122,17 @@ export default function ChecklistCard({
     } finally { setSaving(false); }
   };
 
-  const handleExtractFromPdf = async () => {
-    setMode("extracting");
-    setExtractMsg("Calling Gemini to read the tender document and extract submission items…");
-    try {
-      const resp = await fetch(`/api/extract-checklist?nit=${encodeURIComponent(tenderNit)}`, { method: "POST" });
-      const data = await resp.json();
-      if (!resp.ok) throw new Error(data?.error || `HTTP ${resp.status}`);
-      if (data.created > 0) {
-        const fresh = await getChecklist(tenderNit);
-        setItems(fresh);
-        setMode("idle");
-        setExtractMsg(null);
-      } else {
-        setMode("idle");
-        setExtractMsg(
-          `Gemini couldn't find a checklist / annexure section in this document.\n` +
-          `Try: Copy from another tender, pick a template, or build it manually.`,
-        );
-      }
-    } catch (err) {
-      setMode("idle");
-      setExtractMsg(`Extraction failed: ${(err as Error).message}`);
-    }
+  // Extraction runs locally via Ollama — the UI shows the CLI command,
+  // then user refreshes this page when it's done.
+  const handleShowExtractInstructions = () => {
+    setMode("idle");
+    setExtractMsg("SHOW_CLI");
+  };
+
+  const handleRefreshChecklist = async () => {
+    const fresh = await getChecklist(tenderNit);
+    setItems(fresh);
+    setExtractMsg(null);
   };
 
   const handleStatusChange = async (item: ChecklistItem, status: ChecklistStatus) => {
@@ -236,11 +224,11 @@ export default function ChecklistCard({
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <button
-                  onClick={handleExtractFromPdf}
+                  onClick={handleShowExtractInstructions}
                   className="text-left border rounded-lg p-3 hover:bg-gray-50 hover:border-[#0D1F3C] transition-colors"
                 >
                   <div className="text-sm font-medium text-gray-900">Extract from document (LLM)</div>
-                  <div className="text-xs text-gray-500 mt-0.5">Parse the tender PDF with Gemini and pick up every "Annexure / Format / Supporting document".</div>
+                  <div className="text-xs text-gray-500 mt-0.5">Run the local Ollama extractor to pick up every "Annexure / Format / Supporting document" from the RfP PDF.</div>
                 </button>
                 <button
                   onClick={handleOpenCopyPicker}
@@ -264,7 +252,28 @@ export default function ChecklistCard({
                   <div className="text-xs text-gray-500 mt-0.5">Build the checklist yourself from scratch.</div>
                 </button>
               </div>
-              {extractMsg && (
+              {extractMsg === "SHOW_CLI" && (
+                <div className="mt-4 border rounded-lg p-4 bg-gray-50 text-sm">
+                  <div className="font-medium text-gray-900 mb-2">Run this on your laptop</div>
+                  <div className="text-xs text-gray-600 mb-2">
+                    Extraction uses the local Ollama model (Llama 3.2 3B) — no cloud, no quota.
+                    Make sure <code className="bg-gray-200 px-1 rounded">ollama serve</code> is running.
+                  </div>
+                  <pre className="bg-gray-900 text-gray-100 text-xs rounded p-2 overflow-x-auto">
+node scraper/extract-checklist.js {tenderNit}
+                  </pre>
+                  <div className="text-xs text-gray-500 mt-2">
+                    The CLI shows extracted items, you press <kbd className="px-1 border rounded">y</kbd> to write them, then refresh this page.
+                  </div>
+                  <button
+                    onClick={handleRefreshChecklist}
+                    className="mt-3 text-sm text-[#0D1F3C] hover:underline font-medium"
+                  >
+                    ↻ Refresh checklist
+                  </button>
+                </div>
+              )}
+              {extractMsg && extractMsg !== "SHOW_CLI" && (
                 <div className="mt-4 text-xs text-gray-600 bg-gray-50 border rounded-lg p-3 whitespace-pre-line">
                   {extractMsg}
                 </div>

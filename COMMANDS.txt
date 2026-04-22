@@ -67,6 +67,23 @@
 
 
 ───────────────────────────────────────────────────────────────────
+  3f. CHECKLIST EXTRACTOR (Ollama reads RfP PDF -> checklist items)
+───────────────────────────────────────────────────────────────────
+
+  # Extract for every tender that has a PDF but no checklist yet
+  node scraper/extract-checklist.js
+
+  # Extract for a single tender (used by the UI's "Extract" button)
+  node scraper/extract-checklist.js UJVNL-T-04-EE-Solar-2025-26
+
+  # Force re-extraction even for tenders that already have a checklist
+  node scraper/extract-checklist.js --all
+
+  Interactive — shows extracted items grouped by envelope, press y to
+  write them, n to skip, a to auto-approve remaining, q to quit.
+
+
+───────────────────────────────────────────────────────────────────
   3e. SEED DEMO TENDER (UJVNL Dhakrani, hand-verified fields)
 ───────────────────────────────────────────────────────────────────
 
