@@ -645,3 +645,55 @@ export async function applyChecklistTemplate(
   }
   return items.length;
 }
+
+/**
+ * Copy every checklist item from one tender into another. Status values
+ * reset to "pending" since the target tender hasn't been worked on yet.
+ */
+export async function copyChecklistFromTender(
+  fromNit: string,
+  toNit: string,
+  userEmail: string,
+): Promise<number> {
+  const target = await getChecklist(toNit);
+  if (target.length > 0) return target.length;
+  const source = await getChecklist(fromNit);
+  for (const item of source) {
+    await addChecklistItem(toNit, {
+      bucket: item.bucket,
+      order: item.order,
+      document: item.document,
+      reference: item.reference,
+      status: "pending",
+      remarks: null,
+      documentLink: null,
+    }, userEmail);
+  }
+  return source.length;
+}
+
+/**
+ * Return the list of tenders that already have at least one checklist item,
+ * for the "Copy from another tender" picker. Uses a batch of getChecklist
+ * calls — fine for our scale (~100 tenders) but would need a cached count
+ * field on the parent doc for larger datasets.
+ */
+export async function getTendersWithChecklists(): Promise<
+  { nit: string; title: string; authority: string | null; itemCount: number }[]
+> {
+  const snapshot = await getDocs(collection(db, "tenders"));
+  const out: { nit: string; title: string; authority: string | null; itemCount: number }[] = [];
+  for (const d of snapshot.docs) {
+    const checklistSnap = await getDocs(collection(db, "tenders", d.id, "checklist"));
+    if (checklistSnap.size > 0) {
+      const data = d.data();
+      out.push({
+        nit: d.id,
+        title: data.title || "",
+        authority: data.authority || null,
+        itemCount: checklistSnap.size,
+      });
+    }
+  }
+  return out.sort((a, b) => b.itemCount - a.itemCount);
+}

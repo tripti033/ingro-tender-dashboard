@@ -7,6 +7,8 @@ import {
   updateChecklistItem,
   deleteChecklistItem,
   applyChecklistTemplate,
+  copyChecklistFromTender,
+  getTendersWithChecklists,
   type ChecklistItem,
   type ChecklistBucket,
   type ChecklistStatus,
@@ -46,10 +48,12 @@ export default function ChecklistCard({
   const [items, setItems] = useState<ChecklistItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+  const [mode, setMode] = useState<"idle" | "template" | "copy" | "extracting">("idle");
   const [showAdd, setShowAdd] = useState(false);
   const [newItem, setNewItem] = useState({ bucket: "Custom" as ChecklistBucket, document: "", reference: "" });
   const [saving, setSaving] = useState(false);
+  const [copySources, setCopySources] = useState<{ nit: string; title: string; authority: string | null; itemCount: number }[]>([]);
+  const [extractMsg, setExtractMsg] = useState<string | null>(null);
 
   useEffect(() => {
     getChecklist(tenderNit)
@@ -91,8 +95,56 @@ export default function ChecklistCard({
       await applyChecklistTemplate(tenderNit, tpl.items, userEmail);
       const fresh = await getChecklist(tenderNit);
       setItems(fresh);
-      setShowTemplatePicker(false);
+      setMode("idle");
     } finally { setSaving(false); }
+  };
+
+  const handleOpenCopyPicker = async () => {
+    setMode("copy");
+    try {
+      const list = (await getTendersWithChecklists()).filter((t) => t.nit !== tenderNit);
+      setCopySources(list);
+    } catch (err) {
+      console.error("[Checklist] copy sources load failed:", err);
+      setCopySources([]);
+    }
+  };
+
+  const handleCopyFrom = async (fromNit: string) => {
+    setSaving(true);
+    try {
+      await copyChecklistFromTender(fromNit, tenderNit, userEmail);
+      const fresh = await getChecklist(tenderNit);
+      setItems(fresh);
+      setMode("idle");
+    } catch (err) {
+      console.error("[Checklist] copy failed:", err);
+    } finally { setSaving(false); }
+  };
+
+  const handleExtractFromPdf = async () => {
+    setMode("extracting");
+    setExtractMsg("Calling Gemini to read the tender document and extract submission items…");
+    try {
+      const resp = await fetch(`/api/extract-checklist?nit=${encodeURIComponent(tenderNit)}`, { method: "POST" });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data?.error || `HTTP ${resp.status}`);
+      if (data.created > 0) {
+        const fresh = await getChecklist(tenderNit);
+        setItems(fresh);
+        setMode("idle");
+        setExtractMsg(null);
+      } else {
+        setMode("idle");
+        setExtractMsg(
+          `Gemini couldn't find a checklist / annexure section in this document.\n` +
+          `Try: Copy from another tender, pick a template, or build it manually.`,
+        );
+      }
+    } catch (err) {
+      setMode("idle");
+      setExtractMsg(`Extraction failed: ${(err as Error).message}`);
+    }
   };
 
   const handleStatusChange = async (item: ChecklistItem, status: ChecklistStatus) => {
@@ -176,10 +228,53 @@ export default function ChecklistCard({
           {error}
         </div>
       ) : items.length === 0 ? (
-        <div className="text-center py-8">
-          <p className="text-sm text-gray-500 mb-4">No checklist yet. Apply a template to get started.</p>
-          {showTemplatePicker ? (
-            <div className="space-y-2 max-w-md mx-auto text-left">
+        <div className="py-6">
+          {mode === "idle" && (
+            <div className="max-w-xl mx-auto">
+              <p className="text-sm text-gray-600 text-center mb-4">
+                No checklist yet. Build one from the tender document, copy from a similar tender, or start with a template.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <button
+                  onClick={handleExtractFromPdf}
+                  className="text-left border rounded-lg p-3 hover:bg-gray-50 hover:border-[#0D1F3C] transition-colors"
+                >
+                  <div className="text-sm font-medium text-gray-900">Extract from document (LLM)</div>
+                  <div className="text-xs text-gray-500 mt-0.5">Parse the tender PDF with Gemini and pick up every "Annexure / Format / Supporting document".</div>
+                </button>
+                <button
+                  onClick={handleOpenCopyPicker}
+                  className="text-left border rounded-lg p-3 hover:bg-gray-50 hover:border-[#0D1F3C] transition-colors"
+                >
+                  <div className="text-sm font-medium text-gray-900">Copy from another tender</div>
+                  <div className="text-xs text-gray-500 mt-0.5">Pick a tender with an existing checklist. Status resets to pending.</div>
+                </button>
+                <button
+                  onClick={() => setMode("template")}
+                  className="text-left border rounded-lg p-3 hover:bg-gray-50 hover:border-[#0D1F3C] transition-colors"
+                >
+                  <div className="text-sm font-medium text-gray-900">Apply a template</div>
+                  <div className="text-xs text-gray-500 mt-0.5">UJVNL Dhakrani, generic BESS, etc.</div>
+                </button>
+                <button
+                  onClick={() => { setShowAdd(true); }}
+                  className="text-left border rounded-lg p-3 hover:bg-gray-50 hover:border-[#0D1F3C] transition-colors"
+                >
+                  <div className="text-sm font-medium text-gray-900">Start blank</div>
+                  <div className="text-xs text-gray-500 mt-0.5">Build the checklist yourself from scratch.</div>
+                </button>
+              </div>
+              {extractMsg && (
+                <div className="mt-4 text-xs text-gray-600 bg-gray-50 border rounded-lg p-3 whitespace-pre-line">
+                  {extractMsg}
+                </div>
+              )}
+            </div>
+          )}
+
+          {mode === "template" && (
+            <div className="space-y-2 max-w-md mx-auto">
+              <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Pick a template</div>
               {CHECKLIST_TEMPLATES.map((t) => (
                 <button
                   key={t.id}
@@ -192,15 +287,34 @@ export default function ChecklistCard({
                   <div className="text-xs text-gray-400 mt-1">{t.items.length} items</div>
                 </button>
               ))}
-              <button onClick={() => setShowTemplatePicker(false)} className="text-xs text-gray-400 hover:text-gray-600 mt-2">Cancel</button>
+              <button onClick={() => setMode("idle")} className="text-xs text-gray-400 hover:text-gray-600 mt-2">&larr; Back</button>
             </div>
-          ) : (
-            <button
-              onClick={() => setShowTemplatePicker(true)}
-              className="bg-[#0D1F3C] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#162d52] transition-colors"
-            >
-              Apply template
-            </button>
+          )}
+
+          {mode === "copy" && (
+            <div className="space-y-2 max-w-lg mx-auto">
+              <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                Copy from which tender?
+              </div>
+              {copySources.length === 0 ? (
+                <div className="text-sm text-gray-400 py-4 text-center">No other tender has a checklist yet. Build this one first and it'll become copyable.</div>
+              ) : (
+                copySources.map((s) => (
+                  <button
+                    key={s.nit}
+                    onClick={() => handleCopyFrom(s.nit)}
+                    disabled={saving}
+                    className="w-full text-left border rounded-lg p-3 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                  >
+                    <div className="text-sm font-medium text-gray-900 truncate">{s.title || s.nit}</div>
+                    <div className="text-xs text-gray-500 mt-0.5">
+                      {s.authority || "Unknown authority"} &middot; {s.itemCount} item{s.itemCount === 1 ? "" : "s"}
+                    </div>
+                  </button>
+                ))
+              )}
+              <button onClick={() => setMode("idle")} className="text-xs text-gray-400 hover:text-gray-600 mt-2">&larr; Back</button>
+            </div>
           )}
         </div>
       ) : (
