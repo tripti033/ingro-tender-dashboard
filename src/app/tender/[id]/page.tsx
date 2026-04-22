@@ -9,6 +9,7 @@ import { onAuthChange } from "@/lib/auth";
 import { updateFlag, updateNote, updateTender, getEditHistory, getBidsByTender, getEmployees, getCorrigenda, type Tender, type EditHistoryEntry, type Bid, type Employee, type CorrigendumRecord } from "@/lib/firestore";
 import AuthGuard from "@/components/AuthGuard";
 import Sidebar from "@/components/Sidebar";
+import ChecklistCard from "@/components/ChecklistCard";
 
 const FLAG_OPTIONS = [
   { label: "Watching", color: "border-blue-500 bg-blue-50 text-blue-700" },
@@ -486,6 +487,11 @@ function TenderDetailContent() {
               View parent &rarr;
             </button>
           </div>
+        )}
+
+        {/* Submission Checklist — per-tender document tracker */}
+        {user && user.email && (
+          <ChecklistCard tenderNit={id} userEmail={user.email} />
         )}
 
         {/* Corrigenda issued against this tender */}

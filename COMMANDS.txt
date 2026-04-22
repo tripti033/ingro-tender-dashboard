@@ -67,6 +67,16 @@
 
 
 ───────────────────────────────────────────────────────────────────
+  3e. SEED DEMO TENDER (UJVNL Dhakrani, hand-verified fields)
+───────────────────────────────────────────────────────────────────
+
+  # Re-seed the Dhakrani 30MW/75MWh BESS tender (safe to re-run)
+  node scraper/seed-dhakrani.js
+
+  Viewable at: /tender/UJVNL-T-04-EE-Solar-2025-26
+
+
+───────────────────────────────────────────────────────────────────
   3c. CORRIGENDUM DIFFS (LLM extracts what changed)
 ───────────────────────────────────────────────────────────────────
 

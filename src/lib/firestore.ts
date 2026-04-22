@@ -574,3 +574,74 @@ export async function getCorrigenda(parentNit: string): Promise<CorrigendumRecor
   const snap = await getDocs(q);
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as CorrigendumRecord);
 }
+
+// ── Submission Checklist (per-tender) ──
+
+export type ChecklistBucket = "Envelope-1" | "Cover-2" | "Cover-3" | "Custom";
+export type ChecklistStatus = "pending" | "done" | "na" | "blocked";
+
+export interface ChecklistItem {
+  id: string;
+  bucket: ChecklistBucket;
+  order: number;
+  document: string;                // "Net Worth Certificate"
+  reference: string | null;        // "Format 6.6 + CA Certificate"
+  status: ChecklistStatus;
+  remarks: string | null;
+  documentLink: string | null;     // Drive/S3/etc.
+  updatedBy: string | null;        // email
+  updatedAt: Timestamp | null;
+}
+
+export async function getChecklist(tenderNit: string): Promise<ChecklistItem[]> {
+  const q = query(
+    collection(db, "tenders", tenderNit, "checklist"),
+    orderBy("order", "asc"),
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as ChecklistItem);
+}
+
+export async function addChecklistItem(
+  tenderNit: string,
+  data: Omit<ChecklistItem, "id" | "updatedAt" | "updatedBy">,
+  userEmail: string,
+): Promise<string> {
+  const ref = await addDoc(collection(db, "tenders", tenderNit, "checklist"), {
+    ...data,
+    updatedBy: userEmail,
+    updatedAt: Timestamp.now(),
+  });
+  return ref.id;
+}
+
+export async function updateChecklistItem(
+  tenderNit: string,
+  itemId: string,
+  patch: Partial<Omit<ChecklistItem, "id">>,
+  userEmail: string,
+) {
+  await updateDoc(doc(db, "tenders", tenderNit, "checklist", itemId), {
+    ...patch,
+    updatedBy: userEmail,
+    updatedAt: Timestamp.now(),
+  });
+}
+
+export async function deleteChecklistItem(tenderNit: string, itemId: string) {
+  await deleteDoc(doc(db, "tenders", tenderNit, "checklist", itemId));
+}
+
+export async function applyChecklistTemplate(
+  tenderNit: string,
+  items: Omit<ChecklistItem, "id" | "updatedAt" | "updatedBy">[],
+  userEmail: string,
+) {
+  // Only seed if checklist is empty — don't clobber user edits
+  const existing = await getChecklist(tenderNit);
+  if (existing.length > 0) return existing.length;
+  for (const item of items) {
+    await addChecklistItem(tenderNit, item, userEmail);
+  }
+  return items.length;
+}
