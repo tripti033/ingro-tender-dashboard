@@ -127,48 +127,87 @@ async function extractChecklistViaLlm(pdfText, tenderTitle) {
   const prompt = `Tender: "${tenderTitle}"
 
 Read the excerpts below and build the bidder's submission checklist —
-everything they actually have to hand over to be considered: DDs, EMD
-instruments, stamp-paper affidavits, covering letter, formats, CA
-certificates, balance sheets, IT returns, MoA/AoA, BoQ, and anything
-else this specific tender asks for.
+every document, certificate, DD, affidavit, format, annexure, etc.
+that this specific tender asks the bidder to submit. Use the tender's
+OWN wording — quote the actual phrase it uses. Never write a generic
+description.
 
-Tenders often organise submissions into envelopes or covers:
-  - Envelope-1 = physical DDs, EMD, stamp-paper affidavits, hard-copy
-    securities, non-blacklisting certs on stamp paper
-  - Cover-2 = electronic technical bid — formats, CA certs, financials,
-    MoA/AoA, IT returns, signed annexures
-  - Cover-3 = electronic financial bid — BoQ, tariff quote
-  - Custom = anything that doesn't fit cleanly (project-specific asks,
-    unusual certifications, etc.)
+For each item, pick the bucket that matches where the tender says it
+goes:
+  physical / hard-copy / envelope 1  →  bucket "Envelope-1"
+  electronic / technical / cover 2   →  bucket "Cover-2"
+  electronic / financial / cover 3   →  bucket "Cover-3"
+  anything else                       →  bucket "Custom"
+If the tender uses a different label ("Packet", "Part", "Section X"),
+match on meaning.
 
-Use the tender's own wording — every authority uses different labels
-("Envelope", "Cover", "Packet", "Part", etc.). Match on meaning, not
-exact wording. A careful BD person would rather have one extra item
-they don't need than miss one they do — when in doubt, include it and
-note the reference.
-
-Respond with ONLY this JSON shape:
+Shape of reply (ONLY JSON, no prose):
 {
   "items": [
-    {
-      "bucket": "Envelope-1" | "Cover-2" | "Cover-3" | "Custom",
-      "document": "short concrete description (< 180 chars)",
-      "reference": "Format 6.4 / Annexure-E / page 42 — or null if not given"
-    }
+    { "bucket": "<one of the four above>",
+      "document": "<the tender's own words for what to submit>",
+      "reference": "<the form/annexure number or clause the tender
+                     shows next to this item, or null>" }
   ]
 }
 
-If the text doesn't describe any submission items at all, return {"items": []}.
-Don't invent things that aren't there.
+IMPORTANT:
+- Each "document" string MUST come from the actual tender text below.
+  Do NOT write generic phrases. Do NOT paste examples from these
+  instructions. If you didn't see a specific item in the text, don't
+  list it.
+- Each "reference" MUST be a real Format/Annexure/Clause/Page number
+  that appears IN THE TEXT for that specific item. If none is shown,
+  use null. Do not invent a reference.
+- If the text below is truncated / doesn't contain a submission list,
+  return {"items": []}. Empty is better than invented.
 
 Text:
 ${pdfText}`;
 
-  const systemPrompt = `You're helping a BD team prepare their bid. Extract the submission checklist from this Indian tender document. Use your judgment — tender wording varies — but stay honest: only list items that are genuinely in the text. Respond with ONLY valid JSON.`;
+  const systemPrompt = `You extract a bidder's submission checklist from Indian tender documents. Every "document" string you output MUST be a phrase that literally appears in the provided text — never a generic template phrase, never an example from the instructions. If you can't find real items, return an empty array. Respond with ONLY valid JSON.`;
   const result = await callLlm(prompt, systemPrompt);
   if (!result) return null;
   const items = Array.isArray(result.items) ? result.items : (Array.isArray(result) ? result : []);
-  return items.filter((x) => x && typeof x.document === "string" && x.document.length > 2);
+
+  // Reject items that look like the model is echoing our own instructions or
+  // generic template language. These exact phrases showed up repeatedly
+  // across unrelated tenders when the old prompt leaked examples.
+  const BANNED_FRAGMENTS = [
+    "format 6.4 / annexure-e / page 42",
+    "or null if not given",
+    "project-specific asks",
+    "unusual certifications",
+    "stamp-paper affidavits, hard-copy securities, non-blacklisting certs",
+    "formats, ca certificates, financials, moa/aoa, it returns, signed annexures",
+    "boq, tariff quote",
+    "electronic technical bid",
+    "electronic financial bid",
+  ];
+  const pdfLower = pdfText.toLowerCase();
+
+  return items.filter((x) => {
+    if (!x || typeof x.document !== "string" || x.document.length < 3) return false;
+    const docLower = x.document.toLowerCase();
+    // 1) block verbatim template echoes
+    if (BANNED_FRAGMENTS.some((f) => docLower.includes(f))) return false;
+    // 2) require that a reasonable chunk of the claim overlaps with the PDF.
+    //    Tokens of length >= 4 that actually appear in the source text.
+    const tokens = docLower.split(/[^a-z0-9]+/).filter((t) => t.length >= 4);
+    if (tokens.length === 0) return false;
+    const hits = tokens.filter((t) => pdfLower.includes(t)).length;
+    if (hits / tokens.length < 0.5) return false; // too many invented words
+    return true;
+  }).map((x) => {
+    // Null out obviously-copied reference strings
+    if (typeof x.reference === "string") {
+      const r = x.reference.toLowerCase();
+      if (r.includes("or null if not given") || r.includes("format 6.4 / annexure-e")) {
+        x.reference = null;
+      }
+    }
+    return x;
+  });
 }
 
 function normaliseBucket(b) {
