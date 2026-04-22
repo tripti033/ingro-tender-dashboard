@@ -1,0 +1,117 @@
+═══════════════════════════════════════════════════════════════════
+  INGRO TENDER DASHBOARD — DAILY / WEEKLY ROUTINE
+═══════════════════════════════════════════════════════════════════
+
+  Always from the project root:
+    cd ~/work/ingro-tender-dashboard
+
+  All detailed command flags are in COMMANDS.txt.
+
+
+───────────────────────────────────────────────────────────────────
+  🤖 AUTOMATED — nothing to run
+───────────────────────────────────────────────────────────────────
+
+  Every 3 hours, GitHub Actions runs:
+    1. node scraper/index.js          ← 14 sources scraped
+    2. node scraper/suggest-merges.js ← new dupe groups surfaced
+
+  Just keep an eye on the Actions tab if runs fail.
+
+
+───────────────────────────────────────────────────────────────────
+  ☀️  DAILY (~5 min) — start of day
+───────────────────────────────────────────────────────────────────
+
+  1. Find winners of newly-closed tenders
+     node scraper/result-tracker.js
+     ⚠ Free-tier Gemini = 20 calls/day. If quota hits, switch model:
+         GEMINI_MODEL=gemini-2.5-flash node scraper/result-tracker.js
+
+  2. Approve LLM field extractions on new tenders
+     (make sure Ollama is running: `ollama serve`)
+     node scraper/llm-review.js --pdf
+     Press y / n / a / q for each. ~30 sec per tender.
+
+  3. Score today's news articles (/alerts feed)
+     node scraper/llm-alerts.js
+
+
+───────────────────────────────────────────────────────────────────
+  📅 WEEKLY (~15 min) — Monday morning
+───────────────────────────────────────────────────────────────────
+
+  1. Extract submission checklists for new tenders
+     node scraper/extract-checklist.js
+     Walks through every tender with a PDF but no checklist.
+     Approve interactively.
+
+  2. LLM-diff any new corrigenda (what changed in the amendment)
+     node scraper/diff-corrigenda.js
+     Writes human-readable summaries like
+     "deadline moved 2026-04-24 → 2026-05-15".
+
+  3. Open the dashboard in a browser and review:
+     • /companies/merges  — approve or reject the dedup suggestions
+                            the scraper accumulated this week
+     • /alerts            — check high-relevance articles
+     • /reminders (🔔)    — clear reminders that fired
+
+
+───────────────────────────────────────────────────────────────────
+  🗓  MONTHLY — first Monday of the month
+───────────────────────────────────────────────────────────────────
+
+  1. Extend history backward by one month
+     node scraper/backfill-tenders.js 2024-01 2024-01 --dry
+     node scraper/backfill-tenders.js 2024-01 2024-01
+     Eats Gemini quota — plan 1 month per day.
+
+  2. Sanity sweep: placeholder contacts, re-retry LLM fails
+     node scraper/clean-fake-contacts.js --dry
+     node scraper/clean-fake-contacts.js              # apply if clean
+     node scraper/llm-review.js --pdf --retry-failed  # retry hopeless LLM cases
+
+
+───────────────────────────────────────────────────────────────────
+  🚨 AS-NEEDED — not on schedule
+───────────────────────────────────────────────────────────────────
+
+  • A scraper source misbehaves / you want a fresh scrape now
+      node scraper/index.js
+
+  • Marathi text appears on a MEDA tender
+      node scraper/fix-meda-titles.js
+
+  • You ran the UI "Extract from document (LLM)" and it showed CLI
+      node scraper/extract-checklist.js <NIT>
+
+  • Merge suggestions got stale / you want a fresh batch
+      node scraper/suggest-merges.js --clear
+      node scraper/suggest-merges.js
+
+  • Deploy code changes
+      git push        # Vercel auto-deploys on push to main
+
+
+───────────────────────────────────────────────────────────────────
+  ⚙️  ONE-OFF / ALREADY DONE — you shouldn't need these again
+───────────────────────────────────────────────────────────────────
+
+  Seed the UJVNL Dhakrani demo tender         node scraper/seed-dhakrani.js
+  Import original CRM from Excel              node scraper/import-crm.js
+  Import old tenders from Excel               node scraper/import-excel.js
+
+
+───────────────────────────────────────────────────────────────────
+  QUICK REFERENCE — "what should I run RIGHT NOW?"
+───────────────────────────────────────────────────────────────────
+
+   Just woke up               →  result-tracker + llm-review --pdf
+   It's Monday                →  extract-checklist + diff-corrigenda
+   It's the 1st               →  backfill-tenders + clean-fake-contacts
+   Seeing weird data          →  clean-fake-contacts + fix-meda-titles
+   Demoing today              →  node scraper/index.js (fresh data)
+   Code change                →  git push (that's it)
+
+═══════════════════════════════════════════════════════════════════
