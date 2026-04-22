@@ -82,31 +82,37 @@ function formatParentFields(parent) {
 
 async function askGemini(parentFields, corrTitle, corrPdfText) {
   if (!GEMINI_API_KEY) return null;
-  const prompt = `You are diffing a tender corrigendum against the original tender.
+  const prompt = `A BD team is tracking an Indian BESS tender and an amendment (corrigendum) has been issued. Help them see what actually changed so they don't miss an extended deadline, a revised EMD, or a new eligibility criterion.
 
-Original tender fields (as currently recorded):
+Original tender (as currently recorded in the database):
 ${JSON.stringify(parentFields, null, 2)}
 
 Corrigendum title: ${corrTitle}
 
-Corrigendum document text (truncated):
+Corrigendum document text (possibly truncated):
 """
 ${corrPdfText || "(no PDF available — rely on title only)"}
 """
 
-Return ONLY valid JSON (no markdown) of this shape:
+Read both, figure out what's different, and return the diff a BD person would actually care about. Most corrigenda just shift dates or tweak EMD/PBG. Some expand eligibility, add formats, or re-scope the project — flag those too in the summary.
+
+Shape of reply (ONLY JSON, no prose):
 {
-  "summary": "one short sentence describing what the corrigendum changes",
+  "summary": "one tight sentence — what changed, in plain English",
   "changes": [
     {"field": "bidDeadline", "from": "2026-04-30", "to": "2026-05-15"},
     {"field": "emdAmount", "from": 5000000, "to": 7500000}
   ]
 }
 
-Rules:
-- Only include fields that ACTUALLY changed. Don't invent.
-- Use ISO dates (YYYY-MM-DD) for date fields, numbers for amounts.
-- If nothing substantive changed, return {"summary": "...", "changes": []}.`;
+A few conventions:
+  - ISO dates (YYYY-MM-DD) for date fields.
+  - Plain numbers for amounts (INR, no units).
+  - Only include fields that actually moved — skip unchanged fields.
+  - If the corrigendum is purely procedural (a typo fix, a clarification
+    that doesn't affect any tracked field), return {"summary": "...", "changes": []}.
+  - Don't invent a change just to justify the JSON — it's fine to return
+    an empty changes array.`;
 
   try {
     const resp = await fetch(`${GEMINI_URL}?key=${GEMINI_API_KEY}`, {

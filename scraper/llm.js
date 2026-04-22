@@ -145,26 +145,31 @@ export async function callLlm(prompt, systemPrompt = null) {
 export async function extractTenderFields(title, description = "") {
   const text = `${title}\n${description}`.slice(0, 2000);
 
-  const systemPrompt = `You are a data extraction assistant for Indian BESS (Battery Energy Storage System) tenders. Extract structured fields from tender text and respond ONLY with valid JSON. No explanation.`;
+  const systemPrompt = `You're triaging incoming Indian BESS (Battery Energy Storage System) tenders for a BD team. You see a single tender line — title plus whatever description the scraper captured — and pull out the key facts. Tender titles are written by many different agencies, so wording is inconsistent. Use your judgment: "500MW/2000MWh" and "500 MW / 2000 MWh" and "500 MW with 2 GWh" all mean the same thing. When the text isn't explicit about a field, return null instead of guessing. Respond with ONLY a JSON object.`;
 
-  const prompt = `Extract these fields from the tender text below. Return null for missing values.
-
-Fields:
-- powerMW: number (MW rating)
-- energyMWh: number (MWh energy capacity)
-- authority: string (SECI, NTPC, GUVNL, MSEDCL, RRVUNL, UPCL, SJVNL, TNGECL, NHPC, PGCIL, IREDA, UJVNL, WBSEDCL, MSETCL, DHBVN, etc.)
-- category: string (must be one of: "Standalone", "FDRE", "S+S", "PSP", "Hybrid")
-- tenderMode: string (must be one of: "EPC", "BOOT", "BOO", "BOT", "DBOO", "DBFOO")
-- location: string (city or region)
-- state: string (Indian state name)
-- connectivityType: string ("ISTS" or "STU / ISC")
-
-Tender text:
+  const prompt = `Here's the tender text:
 """
 ${text}
 """
 
-JSON:`;
+Fill in what you can confidently infer:
+  powerMW         — MW rating as a number
+  energyMWh       — MWh capacity as a number
+  authority       — issuing authority acronym (SECI, NTPC, GUVNL, MSEDCL,
+                    RRVUNL, UPCL, SJVNL, TNGECL, NHPC, PGCIL, IREDA, UJVNL,
+                    WBSEDCL, MSETCL, DHBVN, and similar Indian utilities)
+  category        — best-fit among: Standalone, FDRE, S+S, PSP, Hybrid
+  tenderMode      — best-fit among: EPC, BOOT, BOO, BOT, DBOO, DBFOO
+  location        — city or region mentioned
+  state           — Indian state name
+  connectivityType — "ISTS" or "STU / ISC"
+
+Notes on judgment:
+  - "RfS for firm and dispatchable RE" → category = FDRE
+  - "solar + storage" / "solar with BESS" → S+S
+  - "pumped storage" / "PSP" → PSP
+  - If no solar/wind mention but batteries are the main asset → Standalone
+  - Prefer returning null over a wrong guess.`;
 
   const result = await callLlm(prompt, systemPrompt);
   if (!result) return null;
@@ -235,39 +240,37 @@ export async function extractPdfFields(pdfText, tenderTitle = "") {
   ].join("\n---\n").slice(0, 8000); // 8K chars — sweet spot for 3B model speed + coverage
   console.log(`[LLM] PDF prompt: ${text.length} chars from ${chunks.size} key sections`);
 
-  const systemPrompt = `You are a data extraction assistant for Indian BESS tender documents. You ONLY extract values that appear VERBATIM in the provided text. NEVER invent, guess, or fabricate values. If a value is not literally present in the text, return null for that field. Respond ONLY with valid JSON. No explanation.`;
+  const systemPrompt = `You're helping a BD team at an Indian clean-energy firm decide whether to bid on upcoming BESS (Battery Energy Storage System) tenders and prepare their applications. They read hundreds of tender documents a year, so you're their first pair of eyes — extract the structured fields they'll actually use. Be honest: if something isn't in the text, say so with null. Be careful: if two pieces of data look similar (e.g. two emails in different sections), pick the one a careful BD person would actually use. Respond with ONLY a flat JSON object, no prose.`;
 
-  const prompt = `Extract fields from this Indian BESS tender document. Tender: "${tenderTitle}"
+  const prompt = `Tender: "${tenderTitle}"
 
-Return a FLAT JSON object (no nesting) with these keys:
-minimumBidSize, maxAllocationPerBidder, gridConnected, roundTripEfficiency, minimumAnnualAvailability, dailyCycles, financialClosure, scodMonths, gracePeriod, tenderProcessingFee, tenderDocumentFee, vgfAmount, emdAmount, pbgAmount, successCharges, paymentSecurityFund, portalRegistrationFee, biddingStructure, bespaSigning, connectivityType, contactPerson, contactEmail, contactPhone, bidSubmissionOnline, bidSubmissionOffline, bidOpeningDate
+Read the excerpts below and fill in what a careful BD/applications person would want to know. Use your judgment — tender docs are inconsistent and field names vary, so match on meaning, not exact wording.
 
-CRITICAL RULES:
-- Only extract values that appear LITERALLY in the text below. Do NOT invent.
-- All amounts in INR as plain numbers. Strings for text fields. null if not found.
-- Better to return null than a guess. Hallucinated values will be rejected.
+Expected keys (use null for anything not clearly stated):
+  minimumBidSize, maxAllocationPerBidder, gridConnected, roundTripEfficiency, minimumAnnualAvailability, dailyCycles, financialClosure, scodMonths, gracePeriod, tenderProcessingFee, tenderDocumentFee, vgfAmount, emdAmount, pbgAmount, successCharges, paymentSecurityFund, portalRegistrationFee, biddingStructure, bespaSigning, connectivityType, contactPerson, contactEmail, contactPhone, bidSubmissionOnline, bidSubmissionOffline, bidOpeningDate
 
-CONTACT FIELDS — VERY SPECIFIC:
-Tender docs usually have TWO different sections with emails:
-  (a) a SUBMISSION / RESPONSE address (generic mailbox like
-      contracts@seci.co.in, tenders@ntpc.co.in, procurement@guvnl.com)
-  (b) a DETAILS OF PERSONS TO BE CONTACTED / CONTACT PERSON FOR
-      ASSISTANCE section with actual named officers like
-      "Sh. Pratik Prasun, DGM (C&P), 011-24666237, pratikpr@seci.co.in"
+Conventions:
+  - INR amounts as plain numbers (₹5,000 → 5000). No units, no symbols.
+  - Everything else as a short string.
 
-We want (b), NOT (a). Rules:
-- contactPerson = the first NAMED person in the contact-for-assistance
-  section (with a designation like DGM/Manager/Engineer/Director).
-  NOT the department, NOT the RfS title.
-- contactEmail = that same person's personal office email.
-  REJECT generic mailboxes: contracts@, tenders@, procurement@,
-  support@, cp@, cps@, info@, admin@, helpdesk@.
-- contactPhone = that same person's phone number.
-- If the document only has a generic submission email and no named
-  contact person, return null for ALL THREE contact fields.
+Contact fields are the trickiest part. Tender docs often list TWO different
+email addresses close together:
+  • A SUBMISSION / RESPONSE address — usually a generic/department mailbox
+    (e.g. contracts@xxx, tenders@xxx, procurement@xxx). This is where the
+    bid gets sent, not who to call.
+  • A "DETAILS OF PERSONS TO BE CONTACTED" / "CONTACT PERSON FOR ASSISTANCE"
+    section — a named officer with a designation and personal email
+    (e.g. "Sh. Pratik Prasun, DGM (C&P), pratikpr@xxx").
 
-Example (shape only — your actual values must come from the text):
-{"emdAmount": 5000000, "biddingStructure": "Two-Envelope + e-Reverse Auction", "contactPerson": null, "contactEmail": null}
+contactPerson / contactEmail / contactPhone should describe the NAMED
+officer in the second kind of section. If there's only a generic submission
+mailbox and no named officer, leave all three null rather than guessing.
+
+Also: if the document mentions something genuinely important for a BD team
+that doesn't fit the schema (e.g., an unusual eligibility quirk, a lock-in,
+a land-related constraint, a special certification requirement) — feel free
+to include it as a short "notes" string. Don't fabricate; only add if it's
+clearly in the text.
 
 Text:
 ${text}`;
@@ -376,25 +379,33 @@ ${text}`;
  * Returns: { relevanceScore, category, entities, isTenderAnnouncement, draftTender }
  */
 export async function processAlert(title, sourceUrl = "") {
-  const prompt = `Analyze this Indian energy industry news headline for a BESS (Battery Energy Storage System) company.
+  const prompt = `Help a BD/analyst team at an Indian BESS company triage an incoming news headline. They see a lot of noise from Mercom / PVMagazine / ETEnergyWorld etc. and need you to judge: is this one worth reading?
 
 Headline: "${title}"
 Source: ${sourceUrl}
 
-Return a FLAT JSON with:
-- relevanceScore: number 1-10 (10=directly about BESS tender, 7-9=BESS related, 4-6=energy sector relevant, 1-3=barely relevant)
-- category: string (must be one of: "Tender Announcement", "Policy/Regulatory", "Market Update", "Technology", "Competition", "Opportunity", "General")
-- authorities: array of strings (any mentioned: SECI, NTPC, GUVNL, MSEDCL, MNRE, CEA, PGCIL etc. or null)
-- companies: array of strings (any company names mentioned, or null)
-- states: array of strings (any Indian states mentioned, or null)
-- powerMW: number or null (if MW capacity mentioned)
-- energyMWh: number or null (if MWh mentioned)
-- isTenderAnnouncement: boolean (true if this headline IS about a new tender being issued/floated)
-- oneLinerInsight: string (1 sentence actionable insight for the BESS team)
+Return a flat JSON object with:
+  relevanceScore       — 1-10. Aim for a considered score, not a default.
+                         10 = directly about a live BESS tender we'd want to track
+                         7-9 = BESS-adjacent (capex, policy, competitor, tech)
+                         4-6 = broader energy-sector context
+                         1-3 = barely relevant / clickbait
+  category             — best-fit among: Tender Announcement, Policy/Regulatory,
+                         Market Update, Technology, Competition, Opportunity, General
+  authorities          — array of authorities mentioned (SECI, NTPC, GUVNL,
+                         MSEDCL, MNRE, CEA, PGCIL, etc.), or null
+  companies            — array of company names mentioned, or null
+  states               — array of Indian states mentioned, or null
+  powerMW              — number if a specific MW capacity is mentioned, else null
+  energyMWh            — number if a specific MWh capacity is mentioned, else null
+  isTenderAnnouncement — true only if this headline is specifically about a new
+                         tender being floated/issued (not an award, not a signing)
+  oneLinerInsight      — a tight sentence telling the team what's actionable here
+                         (or why this is mostly noise)
 
-Example: {"relevanceScore": 8, "category": "Tender Announcement", "authorities": ["SECI"], "companies": null, "states": ["Rajasthan"], "powerMW": 500, "energyMWh": 2000, "isTenderAnnouncement": true, "oneLinerInsight": "New SECI 500MW BESS tender in Rajasthan — check eligibility and bid deadline."}`;
+If the headline genuinely isn't an energy story at all, low-score it and say so honestly in the insight. If you notice something the fields above don't capture — e.g. a deadline extension, a VGF change, a new state policy — work it into oneLinerInsight; that's exactly the kind of extra-mile observation the team wants.`;
 
-  const result = await callLlm(prompt, "You are an energy industry analyst for an Indian BESS company. Respond ONLY with valid JSON.");
+  const result = await callLlm(prompt, "You're an energy-industry analyst helping an Indian BESS BD team decide what to read. Be honest about relevance (low scores are fine), be concrete in the insight. Respond with ONLY valid JSON.");
   if (!result) return null;
 
   // Validate relevanceScore

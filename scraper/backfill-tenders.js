@@ -127,36 +127,29 @@ for (const ym of months) {
   console.log(`\n${"═".repeat(60)}`);
   console.log(`Month: ${monthLabel(ym)} (${ym})`);
 
-  const prompt = `You are an expert on Indian BESS (Battery Energy Storage System) tenders.
+  const prompt = `Help a BD team back-fill their tender database. They want every Indian BESS (Battery Energy Storage System) tender that was FLOATED — announced, issued, RfS/RfP released — in ${monthLabel(ym)}.
 
-Search the web and list all BESS tenders that were FLOATED (announced/issued, not necessarily awarded) in India during ${monthLabel(ym)}.
+Search the web thoroughly. Cast a wide net: standalone battery storage, solar+storage / FDRE / hybrid, pumped storage, any EPC/BOOT/BOO/DBFOO model. If you're unsure whether something is "BESS enough", err on the side of including it — they'd rather filter one extra tender than miss one they should have tracked.
 
-Include tenders for:
-- Standalone battery storage
-- Solar + storage / FDRE / hybrid
-- Pumped storage
-- EPC, BOOT, BOO, DBFOO etc.
-
-For each tender, respond with a JSON array of objects (no markdown, no extra text):
+For each tender respond with a JSON array (no markdown, no prose):
 [
   {
-    "nitNumber": "exact NIT as published",
-    "title": "short description, <200 chars",
-    "authority": "SECI / NTPC / GUVNL / etc.",
+    "nitNumber": "exact NIT as published, or null if not visible",
+    "title": "short concrete description, <200 chars",
+    "authority": "SECI / NTPC / GUVNL / NHPC / state utility etc.",
     "state": "Indian state name or null",
     "powerMW": number or null,
     "energyMWh": number or null,
     "category": "Standalone / FDRE / S+S / PSP / Hybrid / null",
     "bidDeadline": "YYYY-MM-DD or null",
     "issueDate": "YYYY-MM-DD or null",
-    "awardedTo": "company name if known, else null",
-    "sourceUrl": "URL to tender doc or announcement",
-    "resultSummary": "one sentence summary"
+    "awardedTo": "company name if already decided, else null",
+    "sourceUrl": "URL to tender doc or press release",
+    "resultSummary": "one tight sentence — capacity, buyer, VGF support, winner if known"
   }
 ]
 
-If no BESS tenders were floated in that month, return [].
-Only include tenders you have a source URL for. Do not hallucinate.`;
+If nothing was floated in that month, return []. Only include tenders you have a real source URL for — don't make anything up. If coverage for a tender is shaky, return it but be honest in resultSummary ("press release unclear about exact capacity" etc.).`;
 
   console.log(`  Asking Gemini (model: ${GEMINI_MODEL})...`);
   const result = await askGemini(prompt);

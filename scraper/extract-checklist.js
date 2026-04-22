@@ -124,40 +124,47 @@ function buildPromptText(pdfText) {
 }
 
 async function extractChecklistViaLlm(pdfText, tenderTitle) {
-  const prompt = `You are reading an Indian BESS (Battery Energy Storage System) tender document.
-Tender: "${tenderTitle}"
+  const prompt = `Tender: "${tenderTitle}"
 
-Find every document, annexure, format, affidavit, certificate, DD, or fee the
-bidder must submit as part of their bid. Look at sections like "Annexures",
-"Supporting Documents", "Submission Checklist", "Covering Letter", "Formats",
-"Envelope-1/2/3", "Cover-1/2/3".
+Read the excerpts below and build the bidder's submission checklist —
+everything they actually have to hand over to be considered: DDs, EMD
+instruments, stamp-paper affidavits, covering letter, formats, CA
+certificates, balance sheets, IT returns, MoA/AoA, BoQ, and anything
+else this specific tender asks for.
 
-Return ONLY this JSON shape (no markdown, no explanation):
+Tenders often organise submissions into envelopes or covers:
+  - Envelope-1 = physical DDs, EMD, stamp-paper affidavits, hard-copy
+    securities, non-blacklisting certs on stamp paper
+  - Cover-2 = electronic technical bid — formats, CA certs, financials,
+    MoA/AoA, IT returns, signed annexures
+  - Cover-3 = electronic financial bid — BoQ, tariff quote
+  - Custom = anything that doesn't fit cleanly (project-specific asks,
+    unusual certifications, etc.)
+
+Use the tender's own wording — every authority uses different labels
+("Envelope", "Cover", "Packet", "Part", etc.). Match on meaning, not
+exact wording. A careful BD person would rather have one extra item
+they don't need than miss one they do — when in doubt, include it and
+note the reference.
+
+Respond with ONLY this JSON shape:
 {
   "items": [
     {
       "bucket": "Envelope-1" | "Cover-2" | "Cover-3" | "Custom",
-      "document": "short description of what to submit (< 180 chars)",
-      "reference": "Format 6.4 / Annexure-E / null"
+      "document": "short concrete description (< 180 chars)",
+      "reference": "Format 6.4 / Annexure-E / page 42 — or null if not given"
     }
   ]
 }
 
-Bucket guide:
-- Envelope-1 = physical DDs, EMD, stamp-paper affidavits, hard-copy securities
-- Cover-2 = electronic technical bid (formats, CA certs, financials, MoA/AoA, IT returns)
-- Cover-3 = electronic financial bid (BoQ, tariff quote)
-- Custom = anything that doesn't fit cleanly
-
-Rules:
-- Only include items that literally appear in the text. DO NOT invent.
-- If no such section exists, return {"items": []}.
-- "document" must be concrete and short. "reference" = the Format/Annexure number if shown.
+If the text doesn't describe any submission items at all, return {"items": []}.
+Don't invent things that aren't there.
 
 Text:
 ${pdfText}`;
 
-  const systemPrompt = `You extract structured checklist data from Indian BESS tender PDFs. Respond ONLY with valid JSON. Extract verbatim, never invent.`;
+  const systemPrompt = `You're helping a BD team prepare their bid. Extract the submission checklist from this Indian tender document. Use your judgment — tender wording varies — but stay honest: only list items that are genuinely in the text. Respond with ONLY valid JSON.`;
   const result = await callLlm(prompt, systemPrompt);
   if (!result) return null;
   const items = Array.isArray(result.items) ? result.items : (Array.isArray(result) ? result : []);

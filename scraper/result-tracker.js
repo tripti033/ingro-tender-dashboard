@@ -64,23 +64,23 @@ async function geminiCall(query, attempt = 1) {
     body: JSON.stringify({
       contents: [{
         parts: [{
-          text: `You are an expert on Indian BESS (Battery Energy Storage System) tenders.
-
-Search the web and answer this question. If the tender result has NOT been announced yet, say "not announced".
+          text: `You're tracking outcomes of Indian BESS (Battery Energy Storage System) tenders for a competitive-intelligence database. Use web search to find out what actually happened with this one — who won, who else bid, at what price, developer if announced separately.
 
 Question: ${query}
 
-Respond ONLY with valid JSON in this exact format (no markdown, no explanation):
+Be careful: Mercom, SaurEnergy, EnergyWatch, and press releases sometimes contradict each other. If the coverage is thin or ambiguous, prefer to say "not announced" rather than guess. A missed award is fine — an invented one isn't.
+
+Respond with ONLY this JSON (no markdown, no explanation):
 {
-  "announced": true or false,
+  "announced": true | false,
   "winners": [{"company": "name", "capacityMWh": number or null, "priceLakhsPerMW": number or null, "priceRsPerKWh": number or null}],
   "bidders": ["company1", "company2"],
   "developer": "company name or null",
   "state": "state name or null",
-  "resultSummary": "one sentence summary"
+  "resultSummary": "one tight sentence describing the result (capacity awarded, price, winners)"
 }
 
-If result is not announced, return: {"announced": false, "winners": null, "bidders": null, "developer": null, "state": null, "resultSummary": "Result not yet announced"}`,
+If the result isn't announced yet OR you can't find solid coverage, return: {"announced": false, "winners": null, "bidders": null, "developer": null, "state": null, "resultSummary": "Result not yet announced"}`,
         }],
       }],
       generationConfig: {
