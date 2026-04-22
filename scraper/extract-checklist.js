@@ -21,7 +21,7 @@ import readline from "readline";
 import axios from "axios";
 import { initializeApp } from "firebase/app";
 import {
-  getFirestore, doc, getDoc, collection, getDocs, addDoc, Timestamp,
+  getFirestore, doc, getDoc, collection, getDocs, addDoc, deleteDoc, Timestamp,
 } from "firebase/firestore";
 import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
 import { callLlm, isLlmAvailable } from "./llm.js";
@@ -259,6 +259,13 @@ async function main() {
     if (choice === "a") { approveAll = true; choice = "y"; console.log(`  ${GREEN}Approving remaining...${RESET}`); }
 
     if (choice === "y") {
+      // Re-running with --all or on the same NIT? Wipe the existing checklist
+      // so we don't duplicate items when the new prompt produces better output.
+      const existing = await getDocs(collection(db, "tenders", t.nitNumber, "checklist"));
+      if (existing.size > 0) {
+        for (const d of existing.docs) await deleteDoc(d.ref);
+        console.log(`  ${DIM}(cleared ${existing.size} old items first)${RESET}`);
+      }
       const bucketOrder = { "Envelope-1": 10, "Cover-2": 10, "Cover-3": 10, "Custom": 10 };
       const now = Timestamp.now();
       for (const it of items) {
