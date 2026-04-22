@@ -594,6 +594,29 @@ function TenderDetailContent() {
                   ) : null} />
                   {t.awardedTo && <Row label="Awarded To" value={<span className="text-green-700 font-medium">{t.awardedTo}</span>} />}
                   {t.developedBy && <Row label="Developed By" value={<span className="text-blue-700 font-medium">{t.developedBy}</span>} />}
+                  {t.resultSources && t.resultSources.length > 0 && (
+                    <div className="py-2.5 border-b border-gray-100">
+                      <div className="text-gray-500 text-sm mb-1">Result Sources</div>
+                      <div className="flex flex-col gap-1">
+                        {t.resultSources.map((s, i) => {
+                          let host = s.url;
+                          try { host = new URL(s.url).hostname.replace(/^www\./, ""); } catch {}
+                          return (
+                            <a
+                              key={i}
+                              href={s.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs text-[#0D1F3C] hover:underline truncate"
+                              title={s.title || s.url}
+                            >
+                              {s.title || host}
+                            </a>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </>
               )}
             </Section>

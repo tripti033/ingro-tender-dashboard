@@ -77,6 +77,7 @@ export interface Tender {
   // Award / Development tracking
   awardedTo: string | null;        // Company that won the bid
   developedBy: string | null;      // Company that develops/executes
+  resultSources: { url: string; title: string | null }[] | null;  // URLs Gemini used to find the result
 
   // Corrigendum linkage
   isCorrigendum: boolean | null;    // true if this row is itself a corrigendum
@@ -419,6 +420,7 @@ export interface Bid {
   state: string | null;
   result: "won" | "lost" | "pending";
   reference: string | null;
+  sourceUrls?: { url: string; title: string | null }[] | null;
 }
 
 export async function getBids(): Promise<Bid[]> {

@@ -70,6 +70,8 @@ Question: ${query}
 
 Be careful: Mercom, SaurEnergy, EnergyWatch, and press releases sometimes contradict each other. If the coverage is thin or ambiguous, prefer to say "not announced" rather than guess. A missed award is fine — an invented one isn't.
 
+Always include the URLs you actually used to form the answer — every article, press release, or tender page you read. The BD team wants to audit your answer and go deeper where useful.
+
 Respond with ONLY this JSON (no markdown, no explanation):
 {
   "announced": true | false,
@@ -77,10 +79,14 @@ Respond with ONLY this JSON (no markdown, no explanation):
   "bidders": ["company1", "company2"],
   "developer": "company name or null",
   "state": "state name or null",
-  "resultSummary": "one tight sentence describing the result (capacity awarded, price, winners)"
+  "resultSummary": "one tight sentence describing the result (capacity awarded, price, winners)",
+  "sources": [
+    {"url": "https://mercomindia.com/...", "title": "headline of the article"},
+    {"url": "https://saurenergy.com/...", "title": "..."}
+  ]
 }
 
-If the result isn't announced yet OR you can't find solid coverage, return: {"announced": false, "winners": null, "bidders": null, "developer": null, "state": null, "resultSummary": "Result not yet announced"}`,
+If the result isn't announced yet OR you can't find solid coverage, return: {"announced": false, "winners": null, "bidders": null, "developer": null, "state": null, "resultSummary": "Result not yet announced", "sources": []}`,
         }],
       }],
       generationConfig: {
@@ -151,8 +157,9 @@ async function askGemini(query) {
     }
 
     const data = await resp.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-    const finishReason = data.candidates?.[0]?.finishReason;
+    const cand = data.candidates?.[0];
+    const text = cand?.content?.parts?.[0]?.text || "";
+    const finishReason = cand?.finishReason;
 
     const parsed = salvageJson(text);
     if (!parsed) {
@@ -162,6 +169,25 @@ async function askGemini(query) {
     if (finishReason === "MAX_TOKENS") {
       console.log(`  [Gemini] WARN: response hit MAX_TOKENS, data may be incomplete`);
     }
+
+    // Grounding metadata — the actual URLs Gemini retrieved during search.
+    // Merge these into whatever the model listed in its JSON "sources".
+    const groundingChunks = cand?.groundingMetadata?.groundingChunks || [];
+    const groundedUrls = groundingChunks
+      .map((c) => c?.web?.uri)
+      .filter(Boolean)
+      .map((url) => ({ url, title: null }));
+
+    const inline = Array.isArray(parsed.sources) ? parsed.sources : [];
+    const seen = new Set();
+    const mergedSources = [];
+    for (const s of [...inline, ...groundedUrls]) {
+      const url = typeof s === "string" ? s : s?.url;
+      if (!url || seen.has(url)) continue;
+      seen.add(url);
+      mergedSources.push({ url, title: (typeof s === "object" && s?.title) || null });
+    }
+    parsed.sources = mergedSources;
     return parsed;
   } catch (err) {
     console.log(`  [Gemini] Error: ${err.message}`);
@@ -237,10 +263,14 @@ async function main() {
       continue;
     }
 
+    const sources = Array.isArray(result.sources) ? result.sources.slice(0, 10) : [];
+    if (sources.length > 0) console.log(`    Sources: ${sources.map((s) => s.url).join(", ")}`);
+
     await updateDoc(doc(db, "tenders", tender.nitNumber), {
       awardedTo,
       developedBy: (result.developer && result.developer !== "null") ? result.developer : null,
       tenderStatus: "awarded",
+      resultSources: sources,
       lastUpdatedAt: Timestamp.now(),
     });
     console.log(`  → Updated: awarded to ${awardedTo}`);
@@ -256,7 +286,7 @@ async function main() {
         tenderName: realAuthority, category: tender.category || null,
         capacityMWh: w.capacityMWh || null, priceStandalone: w.priceLakhsPerMW || null,
         priceFDRE: w.priceRsPerKWh || null, state: result.state || tender.state || null,
-        result: "won", reference: "Gemini Search",
+        result: "won", reference: "Gemini Search", sourceUrls: sources,
       });
       bidsCreated++;
     }
@@ -273,6 +303,7 @@ async function main() {
           tenderName: realAuthority, category: tender.category || null,
           capacityMWh: null, priceStandalone: null, priceFDRE: null,
           state: result.state || tender.state || null, result: "lost", reference: "Gemini Search",
+          sourceUrls: sources,
         });
         bidsCreated++;
       }
