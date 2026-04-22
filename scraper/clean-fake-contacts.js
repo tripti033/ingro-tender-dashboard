@@ -35,7 +35,10 @@ await signInWithEmailAndPassword(
 const db = getFirestore(app);
 
 const EMAIL_RE = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
-const EMAIL_PLACEHOLDER = /^(abc|test|example|contact|info|admin|dummy|xyz|foo|bar|user|someone|name|email|your)@/i;
+// Generic / placeholder / department mailboxes. These are submission / help
+// addresses, not named contact persons, so they shouldn't live in
+// contactEmail.
+const EMAIL_PLACEHOLDER = /^(abc|test|example|contact|info|admin|dummy|xyz|foo|bar|user|someone|name|email|your|contracts?|tenders?|procurement|support|help|helpdesk|cp|cps|cnp|rfs|rfp|eoi|bid|bids|office|enquiry|enquiries|eng|engg|engineering)@/i;
 const PHONE_FAKE = /^(1234567890|0987654321|0000000000|9999999999|1111111111)$/;
 const PERSON_PLACEHOLDER = /^(john\s+doe|jane\s+doe|mr\.?\s+x|contact\s+person|the\s+undersigned|n\.?a\.?|tbd|name|undersigned|\-+)$/i;
 

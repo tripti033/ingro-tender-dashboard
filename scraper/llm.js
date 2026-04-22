@@ -244,14 +244,30 @@ minimumBidSize, maxAllocationPerBidder, gridConnected, roundTripEfficiency, mini
 
 CRITICAL RULES:
 - Only extract values that appear LITERALLY in the text below. Do NOT invent.
-- For contactEmail: must be an actual email address present in the text (not "abc@..." or "contact@example.com"). If no email is present, return null.
-- For contactPhone: must be an actual phone number present in the text. If none, return null.
-- For contactPerson: must be the actual name of a person mentioned in the text. If none, return null.
 - All amounts in INR as plain numbers. Strings for text fields. null if not found.
 - Better to return null than a guess. Hallucinated values will be rejected.
 
+CONTACT FIELDS — VERY SPECIFIC:
+Tender docs usually have TWO different sections with emails:
+  (a) a SUBMISSION / RESPONSE address (generic mailbox like
+      contracts@seci.co.in, tenders@ntpc.co.in, procurement@guvnl.com)
+  (b) a DETAILS OF PERSONS TO BE CONTACTED / CONTACT PERSON FOR
+      ASSISTANCE section with actual named officers like
+      "Sh. Pratik Prasun, DGM (C&P), 011-24666237, pratikpr@seci.co.in"
+
+We want (b), NOT (a). Rules:
+- contactPerson = the first NAMED person in the contact-for-assistance
+  section (with a designation like DGM/Manager/Engineer/Director).
+  NOT the department, NOT the RfS title.
+- contactEmail = that same person's personal office email.
+  REJECT generic mailboxes: contracts@, tenders@, procurement@,
+  support@, cp@, cps@, info@, admin@, helpdesk@.
+- contactPhone = that same person's phone number.
+- If the document only has a generic submission email and no named
+  contact person, return null for ALL THREE contact fields.
+
 Example (shape only — your actual values must come from the text):
-{"emdAmount": 5000000, "biddingStructure": "Two-Envelope + e-Reverse Auction", "contactEmail": null, "contactPerson": null}
+{"emdAmount": 5000000, "biddingStructure": "Two-Envelope + e-Reverse Auction", "contactPerson": null, "contactEmail": null}
 
 Text:
 ${text}`;
@@ -280,13 +296,15 @@ ${text}`;
   if (flat.contactEmail) {
     const email = String(flat.contactEmail).trim();
     const emailRe = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
-    const placeholders = /^(abc|test|example|contact|info|admin|dummy|xyz)@/i;
+    // Fake examples + generic/department mailboxes that aren't an assigned
+    // contact person — we want named-officer emails, not "submission@".
+    const placeholders = /^(abc|test|example|contact|info|admin|dummy|xyz|foo|bar|user|someone|name|email|your|contracts?|tenders?|procurement|support|help|helpdesk|cp|cps|cnp|rfs|rfp|eoi|bid|bids|office|enquiry|enquiries|eng|engg|engineering)@/i;
     if (
       !emailRe.test(email) ||
       placeholders.test(email) ||
       !pdfLower.includes(email.toLowerCase())
     ) {
-      console.log(`[LLM] rejected fabricated contactEmail: ${email}`);
+      console.log(`[LLM] rejected generic/fabricated contactEmail: ${email}`);
       flat.contactEmail = null;
     }
   }
