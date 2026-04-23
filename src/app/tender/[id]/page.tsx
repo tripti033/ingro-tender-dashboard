@@ -10,6 +10,7 @@ import { updateFlag, updateNote, updateTender, getEditHistory, getBidsByTender, 
 import AuthGuard from "@/components/AuthGuard";
 import Sidebar from "@/components/Sidebar";
 import ChecklistSummary from "@/components/ChecklistSummary";
+import ComparableTendersCard from "@/components/ComparableTendersCard";
 
 const FLAG_OPTIONS = [
   { label: "Watching", color: "border-blue-500 bg-blue-50 text-blue-700" },
@@ -510,6 +511,9 @@ function TenderDetailContent() {
 
         {/* Submission Checklist — compact summary; full editor lives on its own page */}
         <ChecklistSummary tenderNit={id} />
+
+        {/* Comparable Tenders — benchmark the tariff against similar awarded projects */}
+        <ComparableTendersCard tender={t} />
 
         {/* Corrigenda issued against this tender */}
         {corrigenda.length > 0 && (

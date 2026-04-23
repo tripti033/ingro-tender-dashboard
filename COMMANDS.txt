@@ -97,6 +97,20 @@
 
 
 ───────────────────────────────────────────────────────────────────
+  3h. SEED COMPARABLE TENDERS (19 historical BESS benchmarks)
+───────────────────────────────────────────────────────────────────
+
+  # One-off: loads 19 past awarded BESS tenders (APTRANSCO, GUVNL,
+  # NHPC, SECI etc.) with winning tariffs into Firestore so the
+  # "Comparable Tenders" card on each tender detail page has a pool
+  # to match against. Safe to re-run.
+  node scraper/seed-comparables.js
+
+  These are stored under NITs like BENCH-* and filtered out of
+  /archives so they don't clutter your active-work views.
+
+
+───────────────────────────────────────────────────────────────────
   3e. SEED DEMO TENDER (UJVNL Dhakrani, hand-verified fields)
 ───────────────────────────────────────────────────────────────────
 

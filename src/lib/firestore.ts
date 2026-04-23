@@ -79,6 +79,16 @@ export interface Tender {
   developedBy: string | null;      // Company that develops/executes
   resultSources: { url: string; title: string | null }[] | null;  // URLs Gemini used to find the result
 
+  // Commercial fields (populated for awarded tenders; enables comparables)
+  tariffRsPerMwPerMonth: number | null;    // winning tariff in ₹/MW/Month
+  vgfRateLakhPerMwh: number | null;        // VGF support in ₹ Lakh per MWh, 0 if none
+  tariffBand: "VGF1" | "VGF2" | "No-VGF" | null;
+  cyclesPerDay: number | null;
+  numBidders: number | null;
+  geographyType: "Plains" | "Desert" | "Hill" | "Coastal" | "Plateau" | "Mixed" | null;
+  contractModel: "BOO" | "BOOT" | "BOT" | "EPC" | null;
+  awardDate: Timestamp | null;
+
   // Corrigendum linkage
   isCorrigendum: boolean | null;    // true if this row is itself a corrigendum
   corrigendumOf: string | null;     // NIT of the parent tender this amends

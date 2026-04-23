@@ -77,6 +77,9 @@ function ArchivesContent() {
   const isArchived = (t: Tender) => {
     // Include tenders that are closed, awarded, cancelled, OR whose
     // deadline has passed (even if the status field is stale).
+    // Exclude historical benchmark seeds — they're for comparables only,
+    // not something the team ever worked on.
+    if ((t.sources || []).includes("excel-comparables-seed")) return false;
     if (t.tenderStatus === "closed" || t.tenderStatus === "awarded" || t.tenderStatus === "cancelled") return true;
     if (!t.bidDeadline) return false;
     try {
