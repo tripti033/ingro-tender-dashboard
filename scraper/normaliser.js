@@ -233,10 +233,13 @@ export function normaliseToSchema(rawTender, source) {
     // Corrigendum fields. Scrapers that know their own schema (e.g. TenderWizard)
     // pre-fill these; otherwise we detect from title. Parent NIT is resolved
     // later by the writer which has access to the full existing dataset.
+    // corrigendumOf MUST be sanitised the same way nitNumber is, otherwise
+    // it won't match the parent's actual document ID (slashes/spaces become
+    // dashes, lowercase becomes uppercase).
     isCorrigendum: rawTender.isCorrigendum != null
       ? !!rawTender.isCorrigendum
       : detectCorrigendum(title, nitNumber),
-    corrigendumOf: rawTender.corrigendumOf || null,
+    corrigendumOf: rawTender.corrigendumOf ? sanitiseNit(rawTender.corrigendumOf) : null,
   };
 }
 
