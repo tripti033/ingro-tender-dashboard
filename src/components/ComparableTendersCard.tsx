@@ -55,11 +55,9 @@ export default function ComparableTendersCard({ tender }: { tender: Tender }) {
   if (comparables.length === 0) {
     return (
       <div className="bg-white rounded-lg border p-5 mb-6">
-        <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Comparable Tenders</h2>
+        <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Comparable Tenders</h2>
         <p className="text-sm text-gray-500">
-          No awarded tenders in the database match this one on duration / capacity yet.
-          Run <code className="bg-gray-100 px-1 rounded">node scraper/result-tracker.js</code> to
-          pick up newly-awarded tenders, or <code className="bg-gray-100 px-1 rounded">node scraper/seed-comparables.js</code> for historical benchmarks.
+          No similar awarded tenders found yet. Comparables need matching duration and capacity — they'll appear here as more awards come through.
         </p>
       </div>
     );
@@ -181,8 +179,7 @@ export default function ComparableTendersCard({ tender }: { tender: Tender }) {
       </div>
 
       <div className="mt-3 text-[11px] text-gray-400">
-        EMD/PBG values and bid capacity not shown for brevity. Click any row to open that tender.
-        Green rows = same VGF band as this tender. Total cost shown as ₹/MW/Month (divide by 1 Lakh for ₹L/MW/Mo).
+        Green rows share the same VGF band. Click any row to open that tender.
       </div>
     </div>
   );

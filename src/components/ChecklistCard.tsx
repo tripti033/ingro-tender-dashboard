@@ -48,12 +48,11 @@ export default function ChecklistCard({
   const [items, setItems] = useState<ChecklistItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [mode, setMode] = useState<"idle" | "template" | "copy" | "extracting">("idle");
+  const [mode, setMode] = useState<"idle" | "template" | "copy">("idle");
   const [showAdd, setShowAdd] = useState(false);
   const [newItem, setNewItem] = useState({ bucket: "Custom" as ChecklistBucket, document: "", reference: "" });
   const [saving, setSaving] = useState(false);
   const [copySources, setCopySources] = useState<{ nit: string; title: string; authority: string | null; itemCount: number }[]>([]);
-  const [extractMsg, setExtractMsg] = useState<string | null>(null);
 
   useEffect(() => {
     getChecklist(tenderNit)
@@ -122,17 +121,9 @@ export default function ChecklistCard({
     } finally { setSaving(false); }
   };
 
-  // Extraction runs locally via Ollama — the UI shows the CLI command,
-  // then user refreshes this page when it's done.
-  const handleShowExtractInstructions = () => {
-    setMode("idle");
-    setExtractMsg("SHOW_CLI");
-  };
-
   const handleRefreshChecklist = async () => {
     const fresh = await getChecklist(tenderNit);
     setItems(fresh);
-    setExtractMsg(null);
   };
 
   const handleStatusChange = async (item: ChecklistItem, status: ChecklistStatus) => {
@@ -222,14 +213,7 @@ export default function ChecklistCard({
               <p className="text-sm text-gray-600 text-center mb-4">
                 No checklist yet. Build one from the tender document, copy from a similar tender, or start with a template.
               </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <button
-                  onClick={handleShowExtractInstructions}
-                  className="text-left border rounded-lg p-3 hover:bg-gray-50 hover:border-[#0D1F3C] transition-colors"
-                >
-                  <div className="text-sm font-medium text-gray-900">Extract from document (LLM)</div>
-                  <div className="text-xs text-gray-500 mt-0.5">Run the local Ollama extractor to pick up every "Annexure / Format / Supporting document" from the RfP PDF.</div>
-                </button>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 <button
                   onClick={handleOpenCopyPicker}
                   className="text-left border rounded-lg p-3 hover:bg-gray-50 hover:border-[#0D1F3C] transition-colors"
@@ -252,32 +236,10 @@ export default function ChecklistCard({
                   <div className="text-xs text-gray-500 mt-0.5">Build the checklist yourself from scratch.</div>
                 </button>
               </div>
-              {extractMsg === "SHOW_CLI" && (
-                <div className="mt-4 border rounded-lg p-4 bg-gray-50 text-sm">
-                  <div className="font-medium text-gray-900 mb-2">Run this on your laptop</div>
-                  <div className="text-xs text-gray-600 mb-2">
-                    Extraction uses the local Ollama model (Llama 3.2 3B) — no cloud, no quota.
-                    Make sure <code className="bg-gray-200 px-1 rounded">ollama serve</code> is running.
-                  </div>
-                  <pre className="bg-gray-900 text-gray-100 text-xs rounded p-2 overflow-x-auto">
-node scraper/extract-checklist.js {tenderNit}
-                  </pre>
-                  <div className="text-xs text-gray-500 mt-2">
-                    The CLI shows extracted items, you press <kbd className="px-1 border rounded">y</kbd> to write them, then refresh this page.
-                  </div>
-                  <button
-                    onClick={handleRefreshChecklist}
-                    className="mt-3 text-sm text-[#0D1F3C] hover:underline font-medium"
-                  >
-                    ↻ Refresh checklist
-                  </button>
-                </div>
-              )}
-              {extractMsg && extractMsg !== "SHOW_CLI" && (
-                <div className="mt-4 text-xs text-gray-600 bg-gray-50 border rounded-lg p-3 whitespace-pre-line">
-                  {extractMsg}
-                </div>
-              )}
+              <div className="mt-4 text-xs text-gray-400 text-center">
+                LLM extraction from the RfP document runs in the background after each scrape.
+                <button onClick={handleRefreshChecklist} className="ml-2 text-[#0D1F3C] hover:underline">↻ Refresh</button>
+              </div>
             </div>
           )}
 
