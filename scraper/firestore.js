@@ -120,6 +120,23 @@ export async function writeTenders(tenders) {
         tender.corrigendumOf = findParentNit(tender, pool);
       }
 
+      // Drop corrigenda whose parent we can't find. An unlinked corrigendum
+      // is useless (no "View parent" target, no tender-under-amendment context)
+      // and clutters the UI. The parent may show up in a later scrape — the
+      // corrigendum will then too, and it'll link correctly.
+      if (tender.isCorrigendum) {
+        const parentId = tender.corrigendumOf;
+        const parentInBatch = parentId && tenders.some(
+          (t) => t !== tender && !t.isCorrigendum && t.nitNumber === parentId,
+        );
+        const parentInDb = parentId && existingLite.some((t) => t.nitNumber === parentId);
+        if (!parentId || (!parentInBatch && !parentInDb)) {
+          skippedCount++;
+          console.log(`[Corrigendum] skip orphan ${tender.nitNumber} (no parent found)`);
+          continue;
+        }
+      }
+
       const docRef = doc(db, "tenders", tender.nitNumber);
       const docSnap = await getDoc(docRef);
 

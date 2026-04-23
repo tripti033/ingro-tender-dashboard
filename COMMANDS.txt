@@ -67,6 +67,17 @@
 
 
 ───────────────────────────────────────────────────────────────────
+  3i. ORPHAN CORRIGENDA CLEANUP
+───────────────────────────────────────────────────────────────────
+
+  # Delete corrigenda whose parent tender is no longer in the
+  # database (scraper now skips writing them on future runs, but
+  # use this to clean out any that already leaked through).
+  node scraper/remove-orphan-corrigenda.js --dry
+  node scraper/remove-orphan-corrigenda.js
+
+
+───────────────────────────────────────────────────────────────────
   3g. TENDERDETAIL PURGE (one-off, already done 2026-04)
 ───────────────────────────────────────────────────────────────────
 
