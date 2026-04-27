@@ -614,7 +614,6 @@ function TenderDetailContent() {
                   <EditSelect label="Connectivity" value={f("connectivityType")} onChange={sf("connectivityType")} options={CONNECTIVITY_OPTIONS} />
                   <EditText label="Bidding Structure" value={f("biddingStructure")} onChange={sf("biddingStructure")} />
                   <EditText label="BESPA Signing" value={f("bespaSigning")} onChange={sf("bespaSigning")} />
-                  <EditSelect label="Assigned To" value={f("assignedTo")} onChange={sf("assignedTo")} options={employeeNames} />
                   <EditText label="Awarded To" value={f("awardedTo")} onChange={sf("awardedTo")} placeholder="Company that won the bid" />
                   <EditText label="Developed By" value={f("developedBy")} onChange={sf("developedBy")} placeholder="Company that develops/executes" />
                 </>
@@ -633,9 +632,6 @@ function TenderDetailContent() {
                   <Row label="Connectivity" value={t.connectivityType} />
                   <Row label="Bidding Structure" value={t.biddingStructure} />
                   <Row label="BESPA Signing" value={t.bespaSigning} />
-                  <Row label="Assigned To" value={t.assignedTo ? (
-                    <span className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full text-xs font-medium">{t.assignedTo}</span>
-                  ) : null} />
                   {t.awardedTo && <Row label="Awarded To" value={<span className="text-green-700 font-medium">{t.awardedTo}</span>} />}
                   {t.developedBy && <Row label="Developed By" value={<span className="text-blue-700 font-medium">{t.developedBy}</span>} />}
                   {t.resultSources && t.resultSources.length > 0 && (
