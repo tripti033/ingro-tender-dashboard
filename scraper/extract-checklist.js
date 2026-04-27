@@ -263,6 +263,20 @@ async function main() {
     const pdfText = await downloadPdfText(t.documentLink);
     if (!pdfText) { console.log("  → Couldn't read PDF, skipping"); skipped++; continue; }
 
+    // Some PDFs (UJVNL Word-export with non-Unicode Devanagari fonts) come
+    // back as gibberish. Skip if the text is mostly non-ASCII or has very
+    // few real English words — the LLM can't recover anything from it and
+    // will hallucinate or echo the gibberish.
+    const totalChars = pdfText.length;
+    const asciiPrintable = (pdfText.match(/[\x20-\x7E\s]/g) || []).length;
+    const englishWords = (pdfText.match(/\b[a-zA-Z]{4,}\b/g) || []).length;
+    if (totalChars < 300 || asciiPrintable / totalChars < 0.6 || englishWords < 50) {
+      console.log(`  ${YELLOW}PDF text looks garbled (ascii ${Math.round(asciiPrintable/totalChars*100)}%, words ${englishWords})${RESET}`);
+      console.log(`  → Skipping. UJVNL Word-export PDFs sometimes have non-Unicode fonts; nothing the LLM can do.`);
+      skipped++;
+      continue;
+    }
+
     const promptText = buildPromptText(pdfText);
     console.log(`  Sending ${promptText.length} chars to Llama...`);
     const items = await extractChecklistViaLlm(promptText, t.title || "");
