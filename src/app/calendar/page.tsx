@@ -132,14 +132,14 @@ function CalendarContent() {
   const isToday = (day: number) => today.getDate() === day && today.getMonth() === month && today.getFullYear() === year;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#0d1015] text-gray-100">
       <Sidebar />
       <div className="sidebar-content px-6 py-6">
-        <h1 className="text-xl font-bold text-gray-900 mb-4">Calendar</h1>
+        <h1 className="text-xl font-bold text-gray-100 mb-4">Calendar</h1>
 
         {/* Today's strip — immediate next-action context */}
-        <div className="mb-4 bg-white border rounded-lg px-4 py-3 flex items-center gap-3 flex-wrap">
-          <div className="text-sm font-semibold text-gray-900 whitespace-nowrap">
+        <div className="mb-4 bg-[#1a1d24] border rounded-lg px-4 py-3 flex items-center gap-3 flex-wrap">
+          <div className="text-sm font-semibold text-gray-100 whitespace-nowrap">
             Today, {today.toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}
           </div>
           <span className="text-gray-300">—</span>
@@ -175,7 +175,7 @@ function CalendarContent() {
           {(filters.myOnly || filters.bessOnly || filters.deadlinesOnly || filters.emdOnly) && (
             <button
               onClick={() => setFilters({ myOnly: false, bessOnly: false, deadlinesOnly: false, emdOnly: false })}
-              className="text-xs text-gray-500 hover:text-gray-700 ml-1"
+              className="text-xs text-gray-500 hover:text-gray-300 ml-1"
             >
               Clear
             </button>
@@ -188,10 +188,10 @@ function CalendarContent() {
         {/* Month nav */}
         <div className="flex items-center justify-between mb-3">
           <button onClick={() => setCurrentMonth(new Date(year, month - 1))}
-            className="text-sm text-gray-600 hover:text-[#0D1F3C] px-3 py-1.5 rounded hover:bg-gray-100">&larr; Prev</button>
-          <h2 className="text-lg font-semibold text-gray-800">{monthName}</h2>
+            className="text-sm text-gray-600 hover:text-[#0D1F3C] px-3 py-1.5 rounded hover:bg-gray-800">&larr; Prev</button>
+          <h2 className="text-lg font-semibold text-gray-200">{monthName}</h2>
           <button onClick={() => setCurrentMonth(new Date(year, month + 1))}
-            className="text-sm text-gray-600 hover:text-[#0D1F3C] px-3 py-1.5 rounded hover:bg-gray-100">Next &rarr;</button>
+            className="text-sm text-gray-600 hover:text-[#0D1F3C] px-3 py-1.5 rounded hover:bg-gray-800">Next &rarr;</button>
         </div>
 
         {/* Type legend (still useful for the colours in the grid) */}
@@ -204,17 +204,17 @@ function CalendarContent() {
         </div>
 
         {loading ? (
-          <div className="h-96 bg-gray-100 rounded animate-pulse" />
+          <div className="h-96 bg-gray-800 rounded animate-pulse" />
         ) : (
-          <div className="bg-white rounded-lg border overflow-hidden">
-            <div className="grid grid-cols-7 bg-gray-50 border-b">
+          <div className="bg-[#1a1d24] rounded-lg border overflow-hidden">
+            <div className="grid grid-cols-7 bg-[#13161c] border-b">
               {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
                 <div key={d} className="px-2 py-2 text-xs font-medium text-gray-500 text-center">{d}</div>
               ))}
             </div>
             <div className="grid grid-cols-7">
               {Array.from({ length: startPad }).map((_, i) => (
-                <div key={`pad-${i}`} className="border-b border-r min-h-[100px] bg-gray-50/50" />
+                <div key={`pad-${i}`} className="border-b border-r min-h-[100px] bg-[#13161c]/50" />
               ))}
               {Array.from({ length: daysInMonth }).map((_, i) => {
                 const day = i + 1;
@@ -246,7 +246,7 @@ function CalendarContent() {
 
         {/* Upcoming list — kept */}
         <div className="mt-6">
-          <h3 className="text-sm font-semibold text-gray-700 mb-3">Upcoming Events</h3>
+          <h3 className="text-sm font-semibold text-gray-300 mb-3">Upcoming Events</h3>
           <div className="space-y-2">
             {filteredEvents
               .filter((e) => e.date >= new Date(today.getFullYear(), today.getMonth(), today.getDate()))
@@ -254,10 +254,10 @@ function CalendarContent() {
               .slice(0, 10)
               .map((e, i) => (
                 <div key={i} onClick={() => router.push(`/tender/${encodeURIComponent(e.tender.nitNumber)}?from=/calendar`)}
-                  className="bg-white rounded-lg border px-4 py-3 flex items-center gap-4 hover:shadow-sm cursor-pointer transition-shadow">
+                  className="bg-[#1a1d24] rounded-lg border px-4 py-3 flex items-center gap-4 hover:shadow-sm cursor-pointer transition-shadow">
                   <div className={`px-2 py-1 rounded text-xs font-medium border ${e.color}`}>{e.label}</div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-gray-900 truncate">{e.tender.title?.slice(0, 60)}</div>
+                    <div className="text-sm font-medium text-gray-100 truncate">{e.tender.title?.slice(0, 60)}</div>
                     <div className="text-xs text-gray-400">{e.tender.authority} {e.tender.powerMW ? `| ${e.tender.powerMW} MW` : ""}</div>
                   </div>
                   <div className="text-sm text-gray-600 shrink-0">
@@ -279,7 +279,7 @@ function Chip({ active, onClick, label }: { active: boolean; onClick: () => void
       className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
         active
           ? "bg-[#0D1F3C] text-white border-[#0D1F3C]"
-          : "bg-white text-gray-700 border-gray-300 hover:border-gray-400 hover:bg-gray-50"
+          : "bg-[#1a1d24] text-gray-300 border-gray-300 hover:border-gray-400 hover:bg-[#13161c]"
       }`}
     >
       {label}

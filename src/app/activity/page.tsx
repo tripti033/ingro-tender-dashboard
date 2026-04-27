@@ -9,7 +9,7 @@ import Sidebar from "@/components/Sidebar";
 const TYPE_ICONS: Record<string, { icon: string; color: string }> = {
   flag: { icon: "F", color: "bg-blue-100 text-blue-700" },
   edit: { icon: "E", color: "bg-amber-100 text-amber-700" },
-  note: { icon: "N", color: "bg-gray-100 text-gray-700" },
+  note: { icon: "N", color: "bg-gray-800 text-gray-300" },
   status: { icon: "S", color: "bg-green-100 text-green-700" },
   assign: { icon: "A", color: "bg-indigo-100 text-indigo-700" },
   create: { icon: "+", color: "bg-emerald-100 text-emerald-700" },
@@ -103,21 +103,21 @@ function ActivityContent() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#0d1015] text-gray-100">
       <Sidebar />
       <div className="sidebar-content px-6 py-6 max-w-3xl">
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-xl font-bold text-gray-900">Activity Feed</h1>
+          <h1 className="text-xl font-bold text-gray-100">Activity Feed</h1>
           <div className="flex items-center gap-3 text-xs">
             <button
               onClick={() => setExpanded(new Set(dateGroups.flatMap((dg) => dg.tenderGroups.map((g) => g.key))))}
-              className="text-gray-500 hover:text-gray-800"
+              className="text-gray-500 hover:text-gray-200"
             >
               Expand all
             </button>
             <button
               onClick={() => setExpanded(new Set())}
-              className="text-gray-500 hover:text-gray-800"
+              className="text-gray-500 hover:text-gray-200"
             >
               Collapse all
             </button>
@@ -125,7 +125,7 @@ function ActivityContent() {
         </div>
 
         {loading ? (
-          <div className="space-y-4">{[...Array(8)].map((_, i) => <div key={i} className="h-16 bg-gray-100 rounded animate-pulse" />)}</div>
+          <div className="space-y-4">{[...Array(8)].map((_, i) => <div key={i} className="h-16 bg-gray-800 rounded animate-pulse" />)}</div>
         ) : activities.length === 0 ? (
           <div className="text-center py-16 text-gray-400">No activity yet. Actions like editing tenders, changing flags, and status updates will appear here.</div>
         ) : (
@@ -140,13 +140,13 @@ function ActivityContent() {
                       const a = g.items[0];
                       const typeInfo = TYPE_ICONS[a.type] || TYPE_ICONS.edit;
                       return (
-                        <div key={g.key} className="bg-white rounded-lg border px-4 py-3 flex items-start gap-3">
+                        <div key={g.key} className="bg-[#1a1d24] rounded-lg border px-4 py-3 flex items-start gap-3">
                           <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${typeInfo.color}`}>
                             {typeInfo.icon}
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="text-sm">
-                              <span className="font-medium text-gray-900">{a.userEmail?.split("@")[0]}</span>
+                              <span className="font-medium text-gray-100">{a.userEmail?.split("@")[0]}</span>
                               {" "}
                               <span className="text-gray-500">{a.description}</span>
                             </div>
@@ -168,22 +168,22 @@ function ActivityContent() {
                     const isOpen = expanded.has(g.key);
                     const uniqueUsers = new Set(g.items.map((i) => (i.userEmail || "").split("@")[0]));
                     return (
-                      <div key={g.key} className="bg-white rounded-lg border overflow-hidden">
+                      <div key={g.key} className="bg-[#1a1d24] rounded-lg border overflow-hidden">
                         <button
                           onClick={() => toggle(g.key)}
-                          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left"
+                          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#13161c] transition-colors text-left"
                         >
                           <span className={`text-gray-400 transition-transform ${isOpen ? "rotate-90" : ""}`}>▸</span>
                           <div className="flex-1 min-w-0">
                             {g.tenderNit ? (
-                              <div className="text-sm font-medium text-gray-900 truncate">
+                              <div className="text-sm font-medium text-gray-100 truncate">
                                 {g.tenderTitle || g.tenderNit}
                               </div>
                             ) : (
-                              <div className="text-sm font-medium text-gray-900">Other actions</div>
+                              <div className="text-sm font-medium text-gray-100">Other actions</div>
                             )}
                             <div className="text-xs text-gray-500 mt-0.5">
-                              <span className="font-medium text-gray-700">{g.items.length} change{g.items.length === 1 ? "" : "s"}</span>
+                              <span className="font-medium text-gray-300">{g.items.length} change{g.items.length === 1 ? "" : "s"}</span>
                               {" — "}
                               {Array.from(uniqueUsers).slice(0, 2).join(", ")}
                               {uniqueUsers.size > 2 && ` +${uniqueUsers.size - 2} more`}
@@ -193,7 +193,7 @@ function ActivityContent() {
                         </button>
 
                         {isOpen && (
-                          <div className="border-t bg-gray-50/50 px-4 py-2">
+                          <div className="border-t bg-[#13161c]/50 px-4 py-2">
                             <ul className="space-y-1.5 ml-2">
                               {g.items.map((a) => {
                                 const typeInfo = TYPE_ICONS[a.type] || TYPE_ICONS.edit;
@@ -204,7 +204,7 @@ function ActivityContent() {
                                       {typeInfo.icon}
                                     </span>
                                     <div className="flex-1 min-w-0">
-                                      <span className="font-medium text-gray-700">{a.userEmail?.split("@")[0]}</span>
+                                      <span className="font-medium text-gray-300">{a.userEmail?.split("@")[0]}</span>
                                       {" "}
                                       <span className="text-gray-600">{a.description}</span>
                                     </div>

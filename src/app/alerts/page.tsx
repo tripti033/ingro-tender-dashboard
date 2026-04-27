@@ -13,7 +13,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   "Technology": "bg-cyan-100 text-cyan-800",
   "Competition": "bg-amber-100 text-amber-800",
   "Opportunity": "bg-green-100 text-green-800",
-  "General": "bg-gray-100 text-gray-600",
+  "General": "bg-gray-800 text-gray-600",
 };
 
 function scoreColor(score: number | null): string {
@@ -68,10 +68,10 @@ function AlertsContent() {
   }, [alerts, search, catFilter, minScore]);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#0d1015] text-gray-100">
       <Sidebar />
       <div className="sidebar-content px-6 py-6">
-        <h1 className="text-xl font-bold text-gray-900 mb-4">Industry Alerts</h1>
+        <h1 className="text-xl font-bold text-gray-100 mb-4">Industry Alerts</h1>
 
         <div className="flex flex-wrap items-center gap-3 mb-4">
           <input type="text" placeholder="Search alerts, companies, states..." value={search} onChange={(e) => setSearch(e.target.value)}
@@ -89,13 +89,13 @@ function AlertsContent() {
         </div>
 
         {loading ? (
-          <div className="space-y-3">{[...Array(8)].map((_, i) => <div key={i} className="h-20 bg-gray-100 rounded animate-pulse" />)}</div>
+          <div className="space-y-3">{[...Array(8)].map((_, i) => <div key={i} className="h-20 bg-gray-800 rounded animate-pulse" />)}</div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-16 text-gray-400">No alerts match your filters</div>
         ) : (
           <div className="space-y-2">
             {filtered.map((alert) => (
-              <div key={alert.id} className={`bg-white rounded-lg border p-4 hover:shadow-sm transition-shadow ${
+              <div key={alert.id} className={`bg-[#1a1d24] rounded-lg border p-4 hover:shadow-sm transition-shadow ${
                 alert.isTenderAnnouncement ? "border-l-4 border-l-red-500" : ""
               }`}>
                 <div className="flex items-start gap-3">
@@ -106,7 +106,7 @@ function AlertsContent() {
 
                   <div className="flex-1 min-w-0">
                     {/* Title */}
-                    <p className="text-sm font-medium text-gray-900 leading-snug">{alert.title}</p>
+                    <p className="text-sm font-medium text-gray-100 leading-snug">{alert.title}</p>
 
                     {/* LLM Insight */}
                     {alert.oneLinerInsight && (
@@ -123,7 +123,7 @@ function AlertsContent() {
                       )}
 
                       {/* Source */}
-                      <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">{alert.source}</span>
+                      <span className="text-[10px] bg-gray-800 text-gray-500 px-1.5 py-0.5 rounded">{alert.source}</span>
 
                       {/* Tender announcement flag */}
                       {alert.isTenderAnnouncement && (

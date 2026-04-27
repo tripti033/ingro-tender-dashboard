@@ -45,16 +45,16 @@ export default function ComparableTendersCard({ tender }: { tender: Tender }) {
 
   if (allTenders === null) {
     return (
-      <div className="bg-white rounded-lg border p-5 mb-6">
+      <div className="bg-[#1a1d24] rounded-lg border p-5 mb-6">
         <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Comparable Tenders</h2>
-        <div className="h-24 bg-gray-100 rounded animate-pulse" />
+        <div className="h-24 bg-gray-800 rounded animate-pulse" />
       </div>
     );
   }
 
   if (comparables.length === 0) {
     return (
-      <div className="bg-white rounded-lg border p-5 mb-6">
+      <div className="bg-[#1a1d24] rounded-lg border p-5 mb-6">
         <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Comparable Tenders</h2>
         <p className="text-sm text-gray-500">
           No similar awarded tenders found yet. Comparables need matching duration and capacity — they'll appear here as more awards come through.
@@ -64,7 +64,7 @@ export default function ComparableTendersCard({ tender }: { tender: Tender }) {
   }
 
   return (
-    <div className="bg-white rounded-lg border p-5 mb-6">
+    <div className="bg-[#1a1d24] rounded-lg border p-5 mb-6">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
           Comparable Tenders ({comparables.length})
@@ -87,7 +87,7 @@ export default function ComparableTendersCard({ tender }: { tender: Tender }) {
           </div>
           <div className="flex items-baseline gap-3 flex-wrap">
             <div>
-              <span className="text-2xl font-bold text-gray-900">{formatTariff(stats.median)}</span>
+              <span className="text-2xl font-bold text-gray-100">{formatTariff(stats.median)}</span>
               <span className="text-xs text-gray-500 ml-1">median /MW/Mo</span>
             </div>
             <div className="text-sm text-gray-600">
@@ -100,7 +100,7 @@ export default function ComparableTendersCard({ tender }: { tender: Tender }) {
             </div>
           </div>
           {notes.length > 0 && (
-            <ul className="mt-3 space-y-1 text-xs text-gray-700 list-disc list-inside">
+            <ul className="mt-3 space-y-1 text-xs text-gray-300 list-disc list-inside">
               {notes.map((n, i) => <li key={i}>{n}</li>)}
             </ul>
           )}
@@ -110,7 +110,7 @@ export default function ComparableTendersCard({ tender }: { tender: Tender }) {
       {/* Table */}
       <div className="overflow-x-auto rounded-lg border">
         <table className="w-full text-xs">
-          <thead className="bg-gray-50 text-left text-gray-500 uppercase tracking-wider">
+          <thead className="bg-[#13161c] text-left text-gray-500 uppercase tracking-wider">
             <tr>
               <th className="px-3 py-2">Tender</th>
               <th className="px-3 py-2">State</th>
@@ -128,7 +128,7 @@ export default function ComparableTendersCard({ tender }: { tender: Tender }) {
             {comparables.map((c) => {
               const sameBand = c.tariffBand === tender.tariffBand;
               return (
-                <tr key={c.nitNumber} className={`hover:bg-gray-50 ${sameBand ? "bg-green-50/30" : ""}`}>
+                <tr key={c.nitNumber} className={`hover:bg-[#13161c] ${sameBand ? "bg-green-50/30" : ""}`}>
                   <td className="px-3 py-2">
                     <button
                       onClick={() => router.push(`/tender/${encodeURIComponent(c.nitNumber)}?from=/tender/${encodeURIComponent(tender.nitNumber)}`)}
@@ -149,13 +149,13 @@ export default function ComparableTendersCard({ tender }: { tender: Tender }) {
                       <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
                         c.tariffBand === "VGF2" ? "bg-green-100 text-green-700"
                         : c.tariffBand === "VGF1" ? "bg-amber-100 text-amber-700"
-                        : "bg-gray-100 text-gray-600"
+                        : "bg-gray-800 text-gray-600"
                       }`}>
                         {c.tariffBand}
                       </span>
                     ) : "—"}
                   </td>
-                  <td className="px-3 py-2 text-right font-semibold text-gray-900">
+                  <td className="px-3 py-2 text-right font-semibold text-gray-100">
                     {formatTariff(c.tariffRsPerMwPerMonth)}
                   </td>
                   <td className="px-3 py-2 text-gray-600 max-w-[140px] truncate" title={c.awardedTo || ""}>

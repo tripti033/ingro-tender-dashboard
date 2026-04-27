@@ -14,7 +14,7 @@ function typeBadge(type: string) {
     Developer: "bg-blue-100 text-blue-800",
     Board: "bg-green-100 text-green-800",
     Private: "bg-purple-100 text-purple-800",
-    Other: "bg-gray-100 text-gray-700",
+    Other: "bg-gray-800 text-gray-300",
   };
   return colors[type] || colors.Other;
 }
@@ -69,11 +69,11 @@ function CompaniesContent() {
   }, [companies, search, typeFilter, sortBy]);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#0d1015] text-gray-100">
       <Sidebar />
       <div className="sidebar-content px-6 py-4">
         <div className="flex items-center justify-between mb-4">
-          <h1 className="text-xl font-bold text-gray-900">Companies</h1>
+          <h1 className="text-xl font-bold text-gray-100">Companies</h1>
           <button onClick={() => setShowAdd(!showAdd)}
             className="bg-[#0D1F3C] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#162d52] transition-colors">
             {showAdd ? "Cancel" : "+ Add Company"}
@@ -94,7 +94,7 @@ function CompaniesContent() {
         )}
 
         {showAdd && (
-          <div className="bg-white rounded-lg border p-5 mb-4">
+          <div className="bg-[#1a1d24] rounded-lg border p-5 mb-4">
             <div className="flex items-center gap-3">
               <input type="text" placeholder="Company Name *" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
                 className="border rounded-lg px-3 py-2 text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-[#0D1F3C]/20" />
@@ -125,13 +125,13 @@ function CompaniesContent() {
         </div>
 
         {loading ? (
-          <div className="space-y-3">{[...Array(8)].map((_, i) => <div key={i} className="h-12 bg-gray-100 rounded animate-pulse" />)}</div>
+          <div className="space-y-3">{[...Array(8)].map((_, i) => <div key={i} className="h-12 bg-gray-800 rounded animate-pulse" />)}</div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-16 text-gray-400">No companies match your search</div>
         ) : (
           <div className="overflow-x-auto rounded-lg border">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 text-left text-gray-500 font-medium text-xs uppercase tracking-wider">
+              <thead className="bg-[#13161c] text-left text-gray-500 font-medium text-xs uppercase tracking-wider">
                 <tr>
                   <th className="px-4 py-3">Company Name</th>
                   <th className="px-4 py-3">Type</th>
@@ -143,7 +143,7 @@ function CompaniesContent() {
               <tbody className="divide-y">
                 {filtered.map((c) => (
                   <tr key={c.id} onClick={() => router.push(`/company/${encodeURIComponent(c.id)}`)}
-                    className="hover:bg-gray-50 cursor-pointer transition-colors">
+                    className="hover:bg-[#13161c] cursor-pointer transition-colors">
                     <td className="px-4 py-3 font-medium">{c.name}</td>
                     <td className="px-4 py-3">
                       <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${typeBadge(c.type)}`}>{c.type}</span>

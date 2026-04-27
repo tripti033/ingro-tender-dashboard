@@ -24,7 +24,7 @@ export default function ChecklistSummary({ tenderNit }: { tenderNit: string }) {
   return (
     <button
       onClick={goToChecklist}
-      className="w-full bg-white rounded-lg border hover:border-[#0D1F3C] hover:shadow-sm transition-all p-5 mb-6 text-left"
+      className="w-full bg-[#1a1d24] rounded-lg border hover:border-[#0D1F3C] hover:shadow-sm transition-all p-5 mb-6 text-left"
     >
       <div className="flex items-center justify-between gap-4">
         <div className="min-w-0">
@@ -33,14 +33,14 @@ export default function ChecklistSummary({ tenderNit }: { tenderNit: string }) {
             <div className="text-sm text-gray-400">Loading…</div>
           ) : items.length === 0 ? (
             <div>
-              <div className="text-sm text-gray-900 font-medium">Not started</div>
+              <div className="text-sm text-gray-100 font-medium">Not started</div>
               <div className="text-xs text-gray-500 mt-0.5">
                 Open to extract from the document, copy from another tender, or apply a template.
               </div>
             </div>
           ) : (
             <div>
-              <div className="text-sm text-gray-900">
+              <div className="text-sm text-gray-100">
                 <span className="font-semibold">{done}</span>
                 <span className="text-gray-500">/{total} done</span>
                 {blocked > 0 && <span className="ml-2 text-red-600 text-xs">· {blocked} blocked</span>}

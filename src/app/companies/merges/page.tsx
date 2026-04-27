@@ -60,7 +60,7 @@ function MergesContent() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#0d1015] text-gray-100">
       <Sidebar />
       <div className="sidebar-content px-6 py-6">
         <button onClick={() => router.push("/companies")} className="text-[#0D1F3C] hover:underline text-sm mb-4 inline-block">
@@ -69,7 +69,7 @@ function MergesContent() {
 
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-xl font-bold text-gray-900">Merge Suggestions</h1>
+            <h1 className="text-xl font-bold text-gray-100">Merge Suggestions</h1>
             <p className="text-sm text-gray-500 mt-1">
               Groups of companies that look like duplicates. Pick the canonical one, then approve.
             </p>
@@ -80,11 +80,11 @@ function MergesContent() {
         {error && <div className="mb-4 bg-red-50 text-red-700 px-4 py-2 rounded-lg text-sm">{error}</div>}
 
         {loading ? (
-          <div className="space-y-3">{[...Array(5)].map((_, i) => <div key={i} className="h-32 bg-gray-100 rounded animate-pulse" />)}</div>
+          <div className="space-y-3">{[...Array(5)].map((_, i) => <div key={i} className="h-32 bg-gray-800 rounded animate-pulse" />)}</div>
         ) : suggestions.length === 0 ? (
           <div className="text-center py-16 text-gray-400">
             <p>No pending suggestions.</p>
-            <p className="text-xs mt-2">Run <code className="bg-gray-100 px-1.5 py-0.5 rounded">node scraper/suggest-merges.js</code> to generate new ones.</p>
+            <p className="text-xs mt-2">Run <code className="bg-gray-800 px-1.5 py-0.5 rounded">node scraper/suggest-merges.js</code> to generate new ones.</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -92,7 +92,7 @@ function MergesContent() {
               const canonicalId = canonicalByGroup[s.id];
               const isWorking = workingId === s.id;
               return (
-                <div key={s.id} className="bg-white rounded-lg border p-5">
+                <div key={s.id} className="bg-[#1a1d24] rounded-lg border p-5">
                   <div className="text-xs text-gray-400 uppercase tracking-wider mb-3">
                     Normalized key: <span className="font-mono text-gray-600">{s.normalizedKey}</span>
                   </div>
@@ -147,7 +147,7 @@ function MergesContent() {
                     <button
                       onClick={() => handleReject(s)}
                       disabled={isWorking}
-                      className="border border-gray-300 text-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 disabled:opacity-50"
+                      className="border border-gray-300 text-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-[#13161c] disabled:opacity-50"
                     >
                       Not duplicates
                     </button>

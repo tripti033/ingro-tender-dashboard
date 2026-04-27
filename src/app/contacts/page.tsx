@@ -51,11 +51,11 @@ function ContactsContent() {
   }, [contacts, search]);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#0d1015] text-gray-100">
       <Sidebar />
       <div className="sidebar-content px-6 py-4">
         <div className="flex items-center justify-between mb-4">
-          <h1 className="text-xl font-bold text-gray-900">Contacts Directory</h1>
+          <h1 className="text-xl font-bold text-gray-100">Contacts Directory</h1>
           <button onClick={() => setShowAdd(!showAdd)}
             className="bg-[#0D1F3C] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#162d52] transition-colors">
             {showAdd ? "Cancel" : "+ Add Contact"}
@@ -63,7 +63,7 @@ function ContactsContent() {
         </div>
 
         {showAdd && (
-          <div className="bg-white rounded-lg border p-5 mb-4">
+          <div className="bg-[#1a1d24] rounded-lg border p-5 mb-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <input type="text" placeholder="Name *" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
                 className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0D1F3C]/20" />
@@ -92,13 +92,13 @@ function ContactsContent() {
         </div>
 
         {loading ? (
-          <div className="space-y-3">{[...Array(8)].map((_, i) => <div key={i} className="h-12 bg-gray-100 rounded animate-pulse" />)}</div>
+          <div className="space-y-3">{[...Array(8)].map((_, i) => <div key={i} className="h-12 bg-gray-800 rounded animate-pulse" />)}</div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-16 text-gray-400">No contacts match your search</div>
         ) : (
           <div className="overflow-x-auto rounded-lg border">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 text-left text-gray-500 font-medium text-xs uppercase tracking-wider">
+              <thead className="bg-[#13161c] text-left text-gray-500 font-medium text-xs uppercase tracking-wider">
                 <tr>
                   <th className="px-4 py-3">Name</th>
                   <th className="px-4 py-3">Company</th>
@@ -110,7 +110,7 @@ function ContactsContent() {
               </thead>
               <tbody className="divide-y">
                 {filtered.map((c) => (
-                  <tr key={c.id} className="hover:bg-gray-50">
+                  <tr key={c.id} className="hover:bg-[#13161c]">
                     <td className="px-4 py-3 font-medium">{c.name}</td>
                     <td className="px-4 py-3">
                       <button onClick={() => router.push(`/company/${encodeURIComponent(c.companyId)}`)}

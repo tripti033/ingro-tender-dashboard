@@ -37,7 +37,7 @@ export default function Navbar() {
                 key={link.href}
                 onClick={() => router.push(link.href)}
                 className={`px-3 py-1.5 rounded text-sm transition-colors ${
-                  isActive ? "bg-white/20 font-medium" : "text-gray-300 hover:bg-white/10"
+                  isActive ? "bg-[#1a1d24]/20 font-medium" : "text-gray-300 hover:bg-[#1a1d24]/10"
                 }`}
               >
                 {link.label}
@@ -49,7 +49,7 @@ export default function Navbar() {
       {user && (
         <div className="flex items-center gap-4">
           <span className="text-sm text-gray-300">{user.email}</span>
-          <button onClick={handleSignOut} className="text-sm bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded transition-colors">
+          <button onClick={handleSignOut} className="text-sm bg-[#1a1d24]/10 hover:bg-[#1a1d24]/20 px-3 py-1.5 rounded transition-colors">
             Sign out
           </button>
         </div>

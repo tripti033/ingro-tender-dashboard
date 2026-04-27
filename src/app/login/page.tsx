@@ -39,17 +39,17 @@ export default function LoginPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-10 w-10 border-4 border-gray-200 border-t-[#0D1F3C]" />
+        <div className="animate-spin rounded-full h-10 w-10 border-4 border-gray-800 border-t-[#0D1F3C]" />
       </div>
     );
   }
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-50">
-      <div className="w-full max-w-sm p-8 bg-white rounded-xl shadow-lg">
+    <div className="flex items-center justify-center min-h-screen bg-[#0d1015] text-gray-100">
+      <div className="w-full max-w-sm p-8 bg-[#1a1d24] rounded-xl shadow-lg">
         <div className="text-center mb-8">
           <img src="/logo.png" alt="Ingro Energy" className="h-12 mx-auto mb-3" />
-          <h2 className="text-lg font-semibold text-gray-800 mb-2">
+          <h2 className="text-lg font-semibold text-gray-200 mb-2">
             BESS Tender Dashboard
           </h2>
           <p className="text-sm text-gray-500">

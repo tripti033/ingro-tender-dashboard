@@ -72,10 +72,10 @@ function AuthoritiesContent() {
   }, [authorities, search, sortBy]);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#0d1015] text-gray-100">
       <Sidebar />
       <div className="sidebar-content px-6 py-6">
-        <h1 className="text-xl font-bold text-gray-900 mb-4">Authorities</h1>
+        <h1 className="text-xl font-bold text-gray-100 mb-4">Authorities</h1>
 
         <div className="flex flex-wrap items-center gap-3 mb-4">
           <input
@@ -99,18 +99,18 @@ function AuthoritiesContent() {
         </div>
 
         {loading ? (
-          <div className="space-y-3">{[...Array(8)].map((_, i) => <div key={i} className="h-16 bg-gray-100 rounded animate-pulse" />)}</div>
+          <div className="space-y-3">{[...Array(8)].map((_, i) => <div key={i} className="h-16 bg-gray-800 rounded animate-pulse" />)}</div>
         ) : (
           <div className="space-y-2">
             {filtered.map((auth) => (
               <button
                 key={auth.name}
                 onClick={() => router.push(`/authority/${encodeURIComponent(auth.name)}`)}
-                className="w-full flex items-center justify-between px-5 py-4 bg-white rounded-lg border hover:bg-gray-50 hover:border-gray-300 transition-colors text-left"
+                className="w-full flex items-center justify-between px-5 py-4 bg-[#1a1d24] rounded-lg border hover:bg-[#13161c] hover:border-gray-300 transition-colors text-left"
               >
                 <div className="flex items-center gap-4 min-w-0">
-                  <span className="text-sm font-semibold text-gray-900 truncate">{auth.name}</span>
-                  <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full whitespace-nowrap">{auth.tenders.length} tenders</span>
+                  <span className="text-sm font-semibold text-gray-100 truncate">{auth.name}</span>
+                  <span className="text-xs bg-gray-800 text-gray-600 px-2 py-0.5 rounded-full whitespace-nowrap">{auth.tenders.length} tenders</span>
                   {auth.activeTenders > 0 && (
                     <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full whitespace-nowrap">{auth.activeTenders} active</span>
                   )}
