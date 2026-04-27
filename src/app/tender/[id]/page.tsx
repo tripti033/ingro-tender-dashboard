@@ -493,31 +493,35 @@ function TenderDetailContent() {
           )}
         </div>
 
-        {/* Assigned To — surfaced near the top so the team knows ownership at a glance */}
+        {/* Assigned To — always-editable dropdown, surfaced near the top */}
         <div className="mb-4 flex items-center gap-3 flex-wrap">
           <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Assigned to</span>
-          {editing ? (
-            <select
-              value={f("assignedTo")}
-              onChange={(e) => sf("assignedTo")(e.target.value)}
-              className="text-sm border rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-[#0D1F3C]/20"
-            >
-              <option value="">— Unassigned —</option>
-              {employeeNames.map((n) => (<option key={n} value={n}>{n}</option>))}
-            </select>
-          ) : t.assignedTo ? (
+          <select
+            value={t.assignedTo || ""}
+            onChange={async (e) => {
+              if (!user) return;
+              const next = e.target.value || null;
+              const prev = t.assignedTo;
+              setTender({ ...t, assignedTo: next });          // optimistic
+              try {
+                await updateTender(t.nitNumber, { assignedTo: next } as Partial<Tender>, t, user.email || "", user.uid);
+              } catch {
+                setTender({ ...t, assignedTo: prev });        // revert on failure
+              }
+            }}
+            className="text-sm border rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-[#0D1F3C]/20"
+          >
+            <option value="">— Unassigned —</option>
+            {employeeNames.map((n) => (<option key={n} value={n}>{n}</option>))}
+          </select>
+          {t.assignedTo && (
             <button
               onClick={() => router.push(`/employee/${encodeURIComponent(t.assignedTo!.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 60))}`)}
-              className="inline-flex items-center gap-2 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-800 px-3 py-1 rounded-full text-sm font-medium transition-colors"
+              className="text-xs text-[#0D1F3C] hover:underline"
               title="Open employee profile"
             >
-              <span className="w-5 h-5 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px] font-bold">
-                {t.assignedTo.split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase()}
-              </span>
-              {t.assignedTo}
+              View profile &rarr;
             </button>
-          ) : (
-            <span className="text-sm text-gray-400 italic">unassigned — open Edit to assign</span>
           )}
         </div>
 
