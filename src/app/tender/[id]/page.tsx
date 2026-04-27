@@ -15,9 +15,9 @@ import ComparableTendersCard from "@/components/ComparableTendersCard";
 const FLAG_OPTIONS = [
   { label: "Watching", color: "border-blue-500 bg-blue-50 text-blue-700" },
   { label: "Applying", color: "border-green-500 bg-green-50 text-green-700" },
-  { label: "Not Interested", color: "border-gray-400 bg-[#13161c] text-gray-600" },
+  { label: "Not Interested", color: "border-gray-400 bg-[var(--bg-subtle)] text-gray-600" },
   { label: "Don\u2019t Qualify", color: "border-red-400 bg-red-50 text-red-700" },
-  { label: "Expired", color: "border-gray-400 bg-[#13161c] text-gray-500" },
+  { label: "Expired", color: "border-gray-400 bg-[var(--bg-subtle)] text-gray-500" },
 ];
 
 const STATUS_PIPELINE = [
@@ -160,7 +160,7 @@ function EditDate({ label, value, onChange }: { label: string; value: string; on
 
 function Section({ title, children, action }: { title: string; children: React.ReactNode; action?: React.ReactNode }) {
   return (
-    <div className="bg-[#1a1d24] rounded-lg border p-5">
+    <div className="bg-[var(--bg-card)] rounded-lg border p-5">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{title}</h2>
         {action}
@@ -415,12 +415,12 @@ function TenderDetailContent() {
     try { await updateNote(tender.nitNumber, user.uid, noteText); setNoteSaved(true); setTimeout(() => setNoteSaved(false), 2000); } catch { /* */ }
   };
 
-  if (loading) return <div className="min-h-screen bg-[#0d1015] text-gray-100"><Sidebar /><div className="sidebar-content flex items-center justify-center py-32"><div className="animate-spin rounded-full h-10 w-10 border-4 border-gray-800 border-t-[#0D1F3C]" /></div></div>;
+  if (loading) return <div className="min-h-screen bg-[var(--bg-body)] text-gray-100"><Sidebar /><div className="sidebar-content flex items-center justify-center py-32"><div className="animate-spin rounded-full h-10 w-10 border-4 border-gray-800 border-t-[#0D1F3C]" /></div></div>;
 
   if (error || !tender) return (
-    <div className="min-h-screen bg-[#0d1015] text-gray-100"><Sidebar /><div className="sidebar-content max-w-2xl mx-auto px-6 py-16">
+    <div className="min-h-screen bg-[var(--bg-body)] text-gray-100"><Sidebar /><div className="sidebar-content max-w-2xl mx-auto px-6 py-16">
       <button onClick={() => router.push(back.href)} className="text-[#0D1F3C] hover:underline text-sm mb-6">&larr; {back.label}</button>
-      <div className="bg-[#1a1d24] border rounded-lg p-8 text-center">
+      <div className="bg-[var(--bg-card)] border rounded-lg p-8 text-center">
         <div className="text-lg font-semibold text-gray-100 mb-2">Tender not found</div>
         <div className="text-sm text-gray-500 mb-4">
           This tender doesn't exist in the database, or the link points to an outdated ID.
@@ -435,7 +435,7 @@ function TenderDetailContent() {
   const t = tender;
 
   return (
-    <div className="min-h-screen bg-[#0d1015] text-gray-100">
+    <div className="min-h-screen bg-[var(--bg-body)] text-gray-100">
       <Sidebar />
       <div className="sidebar-content max-w-7xl mx-auto px-6 py-6">
         <div className="flex items-center justify-between mb-4">
@@ -446,7 +446,7 @@ function TenderDetailContent() {
             </button>
           ) : (
             <div className="flex items-center gap-3">
-              <button onClick={() => setEditing(false)} className="border border-gray-300 text-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-[#13161c]">Cancel</button>
+              <button onClick={() => setEditing(false)} className="border border-gray-300 text-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-[var(--bg-subtle)]">Cancel</button>
               <button onClick={handleSave} disabled={saving}
                 className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700 disabled:opacity-50 transition-colors">
                 {saving ? "Saving..." : "Save Changes"}
@@ -484,7 +484,7 @@ function TenderDetailContent() {
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all whitespace-nowrap ${
                     isActive ? `${s.color} text-white shadow-sm` : "bg-gray-800 text-gray-500 hover:bg-gray-200"
                   }`}>
-                  {isActive && <span className="w-1.5 h-1.5 rounded-full bg-[#1a1d24]" />}
+                  {isActive && <span className="w-1.5 h-1.5 rounded-full bg-[var(--bg-card)]" />}
                   {s.label}
                 </button>
               );
@@ -509,7 +509,7 @@ function TenderDetailContent() {
                 setTender({ ...t, assignedTo: prev });        // revert on failure
               }
             }}
-            className="text-sm border rounded-lg px-3 py-1.5 bg-[#1a1d24] focus:outline-none focus:ring-2 focus:ring-[#0D1F3C]/20"
+            className="text-sm border rounded-lg px-3 py-1.5 bg-[var(--bg-card)] focus:outline-none focus:ring-2 focus:ring-[#0D1F3C]/20"
           >
             <option value="">— Unassigned —</option>
             {employeeNames.map((n) => (<option key={n} value={n}>{n}</option>))}
@@ -557,7 +557,7 @@ function TenderDetailContent() {
 
         {/* Corrigenda issued against this tender */}
         {corrigenda.length > 0 && (
-          <div className="mb-6 bg-[#1a1d24] border rounded-lg p-5">
+          <div className="mb-6 bg-[var(--bg-card)] border rounded-lg p-5">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Corrigenda ({corrigenda.length})</h2>
             </div>
@@ -739,7 +739,7 @@ function TenderDetailContent() {
                 ) : null}
                 {/* Other links */}
                 <div className="flex flex-wrap gap-3">
-                  {t.preBidLink && <a href={t.preBidLink} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 border border-[#0D1F3C] text-[#0D1F3C] px-4 py-2 rounded-lg text-sm hover:bg-[#13161c]">Pre-bid Meeting &rarr;</a>}
+                  {t.preBidLink && <a href={t.preBidLink} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 border border-[#0D1F3C] text-[#0D1F3C] px-4 py-2 rounded-lg text-sm hover:bg-[var(--bg-subtle)]">Pre-bid Meeting &rarr;</a>}
                   {t.sourceUrl && <a href={t.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-[#0D1F3C] hover:underline py-2">View Source &rarr;</a>}
                 </div>
               </Section>
@@ -835,7 +835,7 @@ function TenderDetailContent() {
               <div className="space-y-2">
                 {FLAG_OPTIONS.map((opt) => (
                   <button key={opt.label} onClick={() => handleFlagSelect(opt.label)}
-                    className={`w-full text-left px-4 py-2.5 rounded-lg border-2 text-sm font-medium transition-all ${selectedFlag === opt.label ? opt.color : "border-gray-800 bg-[#1a1d24] text-gray-600 hover:border-gray-300"}`}>
+                    className={`w-full text-left px-4 py-2.5 rounded-lg border-2 text-sm font-medium transition-all ${selectedFlag === opt.label ? opt.color : "border-gray-800 bg-[var(--bg-card)] text-gray-600 hover:border-gray-300"}`}>
                     {opt.label}
                   </button>
                 ))}
@@ -915,7 +915,7 @@ export default function TenderDetailPage() {
   return (
     <AuthGuard>
       <Suspense fallback={
-        <div className="min-h-screen bg-[#0d1015] text-gray-100">
+        <div className="min-h-screen bg-[var(--bg-body)] text-gray-100">
           <Sidebar />
           <div className="sidebar-content flex items-center justify-center py-32">
             <div className="animate-spin rounded-full h-10 w-10 border-4 border-gray-800 border-t-[#0D1F3C]" />

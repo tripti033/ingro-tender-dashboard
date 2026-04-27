@@ -33,7 +33,7 @@ function ChecklistPageContent() {
   }, [id]);
 
   return (
-    <div className="min-h-screen bg-[#0d1015] text-gray-100">
+    <div className="min-h-screen bg-[var(--bg-body)] text-gray-100">
       <Sidebar />
       <div className="sidebar-content max-w-4xl mx-auto px-6 py-6">
         <button

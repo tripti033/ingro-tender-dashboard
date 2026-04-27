@@ -76,7 +76,7 @@ function AuthorityDetailContent() {
   }, [authTenders]);
 
   return (
-    <div className="min-h-screen bg-[#0d1015] text-gray-100">
+    <div className="min-h-screen bg-[var(--bg-body)] text-gray-100">
       <Sidebar />
       <div className="sidebar-content px-6 py-6">
         <button onClick={() => router.push("/authorities")} className="text-[#0D1F3C] hover:underline text-sm mb-4 inline-block">
@@ -94,7 +94,7 @@ function AuthorityDetailContent() {
           <>
             {/* Stats */}
             <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-6">
-              <div className="bg-[#1a1d24] rounded-lg border p-4">
+              <div className="bg-[var(--bg-card)] rounded-lg border p-4">
                 <div className="text-xs text-gray-500 uppercase tracking-wider">Total</div>
                 <div className="text-xl font-bold text-gray-100 mt-1">{authTenders.length}</div>
               </div>
@@ -110,11 +110,11 @@ function AuthorityDetailContent() {
                 <div className="text-xs text-red-700 uppercase tracking-wider">Closed</div>
                 <div className="text-xl font-bold text-red-900 mt-1">{stats.closed}</div>
               </div>
-              <div className="bg-[#1a1d24] rounded-lg border p-4">
+              <div className="bg-[var(--bg-card)] rounded-lg border p-4">
                 <div className="text-xs text-gray-500 uppercase tracking-wider">Total MW</div>
                 <div className="text-xl font-bold text-gray-100 mt-1">{stats.totalMW.toLocaleString()}</div>
               </div>
-              <div className="bg-[#1a1d24] rounded-lg border p-4">
+              <div className="bg-[var(--bg-card)] rounded-lg border p-4">
                 <div className="text-xs text-gray-500 uppercase tracking-wider">Total MWh</div>
                 <div className="text-xl font-bold text-gray-100 mt-1">{stats.totalMWh.toLocaleString()}</div>
               </div>
@@ -137,9 +137,9 @@ function AuthorityDetailContent() {
               <span className="text-sm text-gray-400 ml-auto">{visible.length} of {authTenders.length}</span>
             </div>
 
-            <div className="overflow-x-auto rounded-lg border bg-[#1a1d24]">
+            <div className="overflow-x-auto rounded-lg border bg-[var(--bg-card)]">
               <table className="w-full text-sm">
-                <thead className="bg-[#13161c] text-left text-gray-500 text-xs uppercase tracking-wider">
+                <thead className="bg-[var(--bg-subtle)] text-left text-gray-500 text-xs uppercase tracking-wider">
                   <tr>
                     <th className="px-4 py-3">NIT</th>
                     <th className="px-4 py-3">Title</th>
@@ -164,7 +164,7 @@ function AuthorityDetailContent() {
                           if (e.metaKey || e.ctrlKey) return;
                           window.open(href, "_blank", "noopener,noreferrer");
                         }}
-                        className="hover:bg-[#13161c] cursor-pointer"
+                        className="hover:bg-[var(--bg-subtle)] cursor-pointer"
                       >
                         <td className="px-4 py-2.5 font-mono text-xs whitespace-nowrap" title={t.nitNumber}>
                           {truncate(t.nitNumber, 25)}

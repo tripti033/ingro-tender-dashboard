@@ -132,13 +132,13 @@ function CalendarContent() {
   const isToday = (day: number) => today.getDate() === day && today.getMonth() === month && today.getFullYear() === year;
 
   return (
-    <div className="min-h-screen bg-[#0d1015] text-gray-100">
+    <div className="min-h-screen bg-[var(--bg-body)] text-gray-100">
       <Sidebar />
       <div className="sidebar-content px-6 py-6">
         <h1 className="text-xl font-bold text-gray-100 mb-4">Calendar</h1>
 
         {/* Today's strip — immediate next-action context */}
-        <div className="mb-4 bg-[#1a1d24] border rounded-lg px-4 py-3 flex items-center gap-3 flex-wrap">
+        <div className="mb-4 bg-[var(--bg-card)] border rounded-lg px-4 py-3 flex items-center gap-3 flex-wrap">
           <div className="text-sm font-semibold text-gray-100 whitespace-nowrap">
             Today, {today.toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}
           </div>
@@ -206,15 +206,15 @@ function CalendarContent() {
         {loading ? (
           <div className="h-96 bg-gray-800 rounded animate-pulse" />
         ) : (
-          <div className="bg-[#1a1d24] rounded-lg border overflow-hidden">
-            <div className="grid grid-cols-7 bg-[#13161c] border-b">
+          <div className="bg-[var(--bg-card)] rounded-lg border overflow-hidden">
+            <div className="grid grid-cols-7 bg-[var(--bg-subtle)] border-b">
               {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
                 <div key={d} className="px-2 py-2 text-xs font-medium text-gray-500 text-center">{d}</div>
               ))}
             </div>
             <div className="grid grid-cols-7">
               {Array.from({ length: startPad }).map((_, i) => (
-                <div key={`pad-${i}`} className="border-b border-r min-h-[100px] bg-[#13161c]/50" />
+                <div key={`pad-${i}`} className="border-b border-r min-h-[100px] bg-[var(--bg-subtle)]/50" />
               ))}
               {Array.from({ length: daysInMonth }).map((_, i) => {
                 const day = i + 1;
@@ -254,7 +254,7 @@ function CalendarContent() {
               .slice(0, 10)
               .map((e, i) => (
                 <div key={i} onClick={() => router.push(`/tender/${encodeURIComponent(e.tender.nitNumber)}?from=/calendar`)}
-                  className="bg-[#1a1d24] rounded-lg border px-4 py-3 flex items-center gap-4 hover:shadow-sm cursor-pointer transition-shadow">
+                  className="bg-[var(--bg-card)] rounded-lg border px-4 py-3 flex items-center gap-4 hover:shadow-sm cursor-pointer transition-shadow">
                   <div className={`px-2 py-1 rounded text-xs font-medium border ${e.color}`}>{e.label}</div>
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium text-gray-100 truncate">{e.tender.title?.slice(0, 60)}</div>
@@ -279,7 +279,7 @@ function Chip({ active, onClick, label }: { active: boolean; onClick: () => void
       className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
         active
           ? "bg-[#0D1F3C] text-white border-[#0D1F3C]"
-          : "bg-[#1a1d24] text-gray-300 border-gray-300 hover:border-gray-400 hover:bg-[#13161c]"
+          : "bg-[var(--bg-card)] text-gray-300 border-gray-300 hover:border-gray-400 hover:bg-[var(--bg-subtle)]"
       }`}
     >
       {label}

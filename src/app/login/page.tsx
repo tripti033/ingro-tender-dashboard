@@ -45,8 +45,8 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-[#0d1015] text-gray-100">
-      <div className="w-full max-w-sm p-8 bg-[#1a1d24] rounded-xl shadow-lg">
+    <div className="flex items-center justify-center min-h-screen bg-[var(--bg-body)] text-gray-100">
+      <div className="w-full max-w-sm p-8 bg-[var(--bg-card)] rounded-xl shadow-lg">
         <div className="text-center mb-8">
           <img src="/logo.png" alt="Ingro Energy" className="h-12 mx-auto mb-3" />
           <h2 className="text-lg font-semibold text-gray-200 mb-2">

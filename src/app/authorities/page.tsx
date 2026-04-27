@@ -72,7 +72,7 @@ function AuthoritiesContent() {
   }, [authorities, search, sortBy]);
 
   return (
-    <div className="min-h-screen bg-[#0d1015] text-gray-100">
+    <div className="min-h-screen bg-[var(--bg-body)] text-gray-100">
       <Sidebar />
       <div className="sidebar-content px-6 py-6">
         <h1 className="text-xl font-bold text-gray-100 mb-4">Authorities</h1>
@@ -106,7 +106,7 @@ function AuthoritiesContent() {
               <button
                 key={auth.name}
                 onClick={() => router.push(`/authority/${encodeURIComponent(auth.name)}`)}
-                className="w-full flex items-center justify-between px-5 py-4 bg-[#1a1d24] rounded-lg border hover:bg-[#13161c] hover:border-gray-300 transition-colors text-left"
+                className="w-full flex items-center justify-between px-5 py-4 bg-[var(--bg-card)] rounded-lg border hover:bg-[var(--bg-subtle)] hover:border-gray-300 transition-colors text-left"
               >
                 <div className="flex items-center gap-4 min-w-0">
                   <span className="text-sm font-semibold text-gray-100 truncate">{auth.name}</span>

@@ -105,7 +105,7 @@ export default function ReminderBell({ collapsed }: { collapsed: boolean }) {
       <button
         onClick={() => setOpen(!open)}
         title={`${count} reminder${count === 1 ? "" : "s"}`}
-        className="relative text-gray-400 hover:text-white p-1.5 rounded hover:bg-[#1a1d24]/10 transition-colors"
+        className="relative text-gray-400 hover:text-white p-1.5 rounded hover:bg-[var(--bg-card)]/10 transition-colors"
       >
         {/* Alarm-clock icon — visually distinct from the Alerts bell nav item */}
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
@@ -121,10 +121,10 @@ export default function ReminderBell({ collapsed }: { collapsed: boolean }) {
 
       {open && (
         <div
-          className="fixed top-16 bg-[#1a1d24] rounded-lg shadow-xl border border-gray-800 w-96 max-h-[75vh] overflow-y-auto z-[60]"
+          className="fixed top-16 bg-[var(--bg-card)] rounded-lg shadow-xl border border-gray-800 w-96 max-h-[75vh] overflow-y-auto z-[60]"
           style={{ left: collapsed ? "4.5rem" : "14.5rem" }}
         >
-          <div className="sticky top-0 bg-[#1a1d24] border-b px-4 py-3 flex items-center justify-between">
+          <div className="sticky top-0 bg-[var(--bg-card)] border-b px-4 py-3 flex items-center justify-between">
             <h3 className="text-sm font-semibold text-gray-100">Reminders</h3>
             <span className="text-xs text-gray-400">{count} item{count === 1 ? "" : "s"}</span>
           </div>
@@ -142,7 +142,7 @@ export default function ReminderBell({ collapsed }: { collapsed: boolean }) {
                     setOpen(false);
                     router.push(`/tender/${encodeURIComponent(r.tender.nitNumber)}`);
                   }}
-                  className="w-full text-left px-4 py-3 hover:bg-[#13161c] transition-colors"
+                  className="w-full text-left px-4 py-3 hover:bg-[var(--bg-subtle)] transition-colors"
                 >
                   <div className="flex items-start justify-between gap-2 mb-1">
                     <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap ${TYPE_COLOR[r.type]}`}>

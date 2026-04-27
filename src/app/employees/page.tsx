@@ -73,7 +73,7 @@ function EmployeesContent() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0d1015] text-gray-100">
+    <div className="min-h-screen bg-[var(--bg-body)] text-gray-100">
       <Sidebar />
       <div className="sidebar-content px-6 py-6">
         <div className="flex items-center justify-between mb-6">
@@ -86,7 +86,7 @@ function EmployeesContent() {
 
         {/* Add Employee Form */}
         {showAdd && (
-          <div className="bg-[#1a1d24] rounded-lg border p-5 mb-6">
+          <div className="bg-[var(--bg-card)] rounded-lg border p-5 mb-6">
             <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">New Employee</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <input type="text" placeholder="Name *" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -122,7 +122,7 @@ function EmployeesContent() {
                 <button
                   key={emp.id}
                   onClick={() => router.push(`/employee/${encodeURIComponent(emp.id)}`)}
-                  className="w-full flex items-center justify-between px-5 py-4 bg-[#1a1d24] rounded-lg border hover:bg-[#13161c] hover:border-gray-300 transition-colors text-left"
+                  className="w-full flex items-center justify-between px-5 py-4 bg-[var(--bg-card)] rounded-lg border hover:bg-[var(--bg-subtle)] hover:border-gray-300 transition-colors text-left"
                 >
                   <div className="flex items-center gap-4 min-w-0">
                     <div className="w-10 h-10 rounded-full bg-[#0D1F3C] text-white flex items-center justify-center text-sm font-bold shrink-0">

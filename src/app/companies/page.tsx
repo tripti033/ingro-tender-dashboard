@@ -69,7 +69,7 @@ function CompaniesContent() {
   }, [companies, search, typeFilter, sortBy]);
 
   return (
-    <div className="min-h-screen bg-[#0d1015] text-gray-100">
+    <div className="min-h-screen bg-[var(--bg-body)] text-gray-100">
       <Sidebar />
       <div className="sidebar-content px-6 py-4">
         <div className="flex items-center justify-between mb-4">
@@ -94,7 +94,7 @@ function CompaniesContent() {
         )}
 
         {showAdd && (
-          <div className="bg-[#1a1d24] rounded-lg border p-5 mb-4">
+          <div className="bg-[var(--bg-card)] rounded-lg border p-5 mb-4">
             <div className="flex items-center gap-3">
               <input type="text" placeholder="Company Name *" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
                 className="border rounded-lg px-3 py-2 text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-[#0D1F3C]/20" />
@@ -131,7 +131,7 @@ function CompaniesContent() {
         ) : (
           <div className="overflow-x-auto rounded-lg border">
             <table className="w-full text-sm">
-              <thead className="bg-[#13161c] text-left text-gray-500 font-medium text-xs uppercase tracking-wider">
+              <thead className="bg-[var(--bg-subtle)] text-left text-gray-500 font-medium text-xs uppercase tracking-wider">
                 <tr>
                   <th className="px-4 py-3">Company Name</th>
                   <th className="px-4 py-3">Type</th>
@@ -143,7 +143,7 @@ function CompaniesContent() {
               <tbody className="divide-y">
                 {filtered.map((c) => (
                   <tr key={c.id} onClick={() => router.push(`/company/${encodeURIComponent(c.id)}`)}
-                    className="hover:bg-[#13161c] cursor-pointer transition-colors">
+                    className="hover:bg-[var(--bg-subtle)] cursor-pointer transition-colors">
                     <td className="px-4 py-3 font-medium">{c.name}</td>
                     <td className="px-4 py-3">
                       <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${typeBadge(c.type)}`}>{c.type}</span>

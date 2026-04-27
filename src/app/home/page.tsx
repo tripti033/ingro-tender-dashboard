@@ -170,7 +170,7 @@ function HomeContent() {
   const meDisplay = meName ? meName[0].toUpperCase() + meName.slice(1) : "there";
 
   return (
-    <div className="min-h-screen bg-[#0d1015] text-gray-100">
+    <div className="min-h-screen bg-[var(--bg-body)] text-gray-100">
       <Sidebar />
       <div className="sidebar-content px-8 py-6 max-w-7xl">
         {/* Header */}
@@ -225,7 +225,7 @@ function HomeContent() {
         )}
 
         {/* Closing soon */}
-        <div className="bg-[#1a1d24] rounded-xl p-5 mb-6 border border-gray-800">
+        <div className="bg-[var(--bg-card)] rounded-xl p-5 mb-6 border border-gray-800">
           <div className="flex items-start justify-between mb-4">
             <h2 className="text-lg font-semibold">Closing soon</h2>
             <div className="flex items-center gap-3 text-xs text-gray-400">
@@ -270,7 +270,7 @@ function HomeContent() {
         {/* Two-column row */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* My tenders */}
-          <div className="bg-[#1a1d24] rounded-xl p-5 border border-gray-800">
+          <div className="bg-[var(--bg-card)] rounded-xl p-5 border border-gray-800">
             <h2 className="text-lg font-semibold mb-4">My tenders <span className="text-sm text-gray-500 font-normal">· in progress</span></h2>
             {loading ? (
               <div className="space-y-3">{[...Array(4)].map((_, i) => <div key={i} className="h-12 bg-gray-800/50 rounded animate-pulse" />)}</div>
@@ -309,7 +309,7 @@ function HomeContent() {
           </div>
 
           {/* Industry pulse */}
-          <div className="bg-[#1a1d24] rounded-xl p-5 border border-gray-800">
+          <div className="bg-[var(--bg-card)] rounded-xl p-5 border border-gray-800">
             <div className="flex items-baseline justify-between mb-4">
               <h2 className="text-lg font-semibold">Industry pulse</h2>
               {industryPulse.length > 0 && (
@@ -351,7 +351,7 @@ function Kpi({
   return (
     <Wrapper
       onClick={onClick}
-      className={`bg-[#1a1d24] border border-gray-800 rounded-xl p-5 text-left ${onClick ? "hover:border-gray-600 transition-colors cursor-pointer" : ""}`}
+      className={`bg-[var(--bg-card)] border border-gray-800 rounded-xl p-5 text-left ${onClick ? "hover:border-gray-600 transition-colors cursor-pointer" : ""}`}
     >
       <div className="text-xs font-medium text-gray-400 mb-2">{label}</div>
       <div className="text-3xl font-bold text-gray-100">{value}</div>

@@ -60,7 +60,7 @@ function MergesContent() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0d1015] text-gray-100">
+    <div className="min-h-screen bg-[var(--bg-body)] text-gray-100">
       <Sidebar />
       <div className="sidebar-content px-6 py-6">
         <button onClick={() => router.push("/companies")} className="text-[#0D1F3C] hover:underline text-sm mb-4 inline-block">
@@ -92,7 +92,7 @@ function MergesContent() {
               const canonicalId = canonicalByGroup[s.id];
               const isWorking = workingId === s.id;
               return (
-                <div key={s.id} className="bg-[#1a1d24] rounded-lg border p-5">
+                <div key={s.id} className="bg-[var(--bg-card)] rounded-lg border p-5">
                   <div className="text-xs text-gray-400 uppercase tracking-wider mb-3">
                     Normalized key: <span className="font-mono text-gray-600">{s.normalizedKey}</span>
                   </div>
@@ -147,7 +147,7 @@ function MergesContent() {
                     <button
                       onClick={() => handleReject(s)}
                       disabled={isWorking}
-                      className="border border-gray-300 text-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-[#13161c] disabled:opacity-50"
+                      className="border border-gray-300 text-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-[var(--bg-subtle)] disabled:opacity-50"
                     >
                       Not duplicates
                     </button>

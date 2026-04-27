@@ -24,7 +24,7 @@ export default function ChecklistSummary({ tenderNit }: { tenderNit: string }) {
   return (
     <button
       onClick={goToChecklist}
-      className="w-full bg-[#1a1d24] rounded-lg border hover:border-[#0D1F3C] hover:shadow-sm transition-all p-5 mb-6 text-left"
+      className="w-full bg-[var(--bg-card)] rounded-lg border hover:border-[#0D1F3C] hover:shadow-sm transition-all p-5 mb-6 text-left"
     >
       <div className="flex items-center justify-between gap-4">
         <div className="min-w-0">

@@ -45,7 +45,7 @@ export default function ComparableTendersCard({ tender }: { tender: Tender }) {
 
   if (allTenders === null) {
     return (
-      <div className="bg-[#1a1d24] rounded-lg border p-5 mb-6">
+      <div className="bg-[var(--bg-card)] rounded-lg border p-5 mb-6">
         <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Comparable Tenders</h2>
         <div className="h-24 bg-gray-800 rounded animate-pulse" />
       </div>
@@ -54,7 +54,7 @@ export default function ComparableTendersCard({ tender }: { tender: Tender }) {
 
   if (comparables.length === 0) {
     return (
-      <div className="bg-[#1a1d24] rounded-lg border p-5 mb-6">
+      <div className="bg-[var(--bg-card)] rounded-lg border p-5 mb-6">
         <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Comparable Tenders</h2>
         <p className="text-sm text-gray-500">
           No similar awarded tenders found yet. Comparables need matching duration and capacity — they'll appear here as more awards come through.
@@ -64,7 +64,7 @@ export default function ComparableTendersCard({ tender }: { tender: Tender }) {
   }
 
   return (
-    <div className="bg-[#1a1d24] rounded-lg border p-5 mb-6">
+    <div className="bg-[var(--bg-card)] rounded-lg border p-5 mb-6">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
           Comparable Tenders ({comparables.length})
@@ -110,7 +110,7 @@ export default function ComparableTendersCard({ tender }: { tender: Tender }) {
       {/* Table */}
       <div className="overflow-x-auto rounded-lg border">
         <table className="w-full text-xs">
-          <thead className="bg-[#13161c] text-left text-gray-500 uppercase tracking-wider">
+          <thead className="bg-[var(--bg-subtle)] text-left text-gray-500 uppercase tracking-wider">
             <tr>
               <th className="px-3 py-2">Tender</th>
               <th className="px-3 py-2">State</th>
@@ -128,7 +128,7 @@ export default function ComparableTendersCard({ tender }: { tender: Tender }) {
             {comparables.map((c) => {
               const sameBand = c.tariffBand === tender.tariffBand;
               return (
-                <tr key={c.nitNumber} className={`hover:bg-[#13161c] ${sameBand ? "bg-green-50/30" : ""}`}>
+                <tr key={c.nitNumber} className={`hover:bg-[var(--bg-subtle)] ${sameBand ? "bg-green-50/30" : ""}`}>
                   <td className="px-3 py-2">
                     <button
                       onClick={() => router.push(`/tender/${encodeURIComponent(c.nitNumber)}?from=/tender/${encodeURIComponent(tender.nitNumber)}`)}

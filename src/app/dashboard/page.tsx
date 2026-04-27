@@ -226,11 +226,11 @@ function DashboardContent() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0d1015] text-gray-100">
+    <div className="min-h-screen bg-[var(--bg-body)] text-gray-100">
       <Sidebar />
 
       {/* Filter bar */}
-      <div className="sidebar-content sticky top-0 z-40 bg-[#1a1d24] border-b px-6 py-3">
+      <div className="sidebar-content sticky top-0 z-40 bg-[var(--bg-card)] border-b px-6 py-3">
         <div className="flex flex-wrap items-center gap-3">
           <input
             type="text"
@@ -296,7 +296,7 @@ function DashboardContent() {
         ) : (
           <div className="overflow-x-auto rounded-lg border">
             <table className="w-full text-sm">
-              <thead className="bg-[#13161c] text-left text-gray-500 font-medium text-xs uppercase tracking-wider">
+              <thead className="bg-[var(--bg-subtle)] text-left text-gray-500 font-medium text-xs uppercase tracking-wider">
                 <tr>
                   <th className="px-1 py-3 w-6"></th>
                   <th className="px-3 py-3 whitespace-nowrap">NIT Number</th>
@@ -327,7 +327,7 @@ function DashboardContent() {
                       }
                       router.push(`/tender/${encodeURIComponent(t.nitNumber)}`);
                     }}
-                    className={`hover:bg-[#13161c] cursor-pointer transition-colors ${getRowStyle(t)} ${
+                    className={`hover:bg-[var(--bg-subtle)] cursor-pointer transition-colors ${getRowStyle(t)} ${
                       user && (!t.readBy || !t.readBy[user.uid]) ? "font-semibold" : "font-normal text-gray-600"
                     }`}
                   >
@@ -421,28 +421,28 @@ function DashboardContent() {
               <button
                 onClick={() => setPage(1)}
                 disabled={currentPage === 1}
-                className="px-3 py-1.5 rounded border border-gray-300 hover:bg-[#13161c] disabled:opacity-40 disabled:cursor-not-allowed"
+                className="px-3 py-1.5 rounded border border-gray-300 hover:bg-[var(--bg-subtle)] disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 &laquo; First
               </button>
               <button
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
-                className="px-3 py-1.5 rounded border border-gray-300 hover:bg-[#13161c] disabled:opacity-40 disabled:cursor-not-allowed"
+                className="px-3 py-1.5 rounded border border-gray-300 hover:bg-[var(--bg-subtle)] disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Prev
               </button>
               <button
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={currentPage === totalPages}
-                className="px-3 py-1.5 rounded border border-gray-300 hover:bg-[#13161c] disabled:opacity-40 disabled:cursor-not-allowed"
+                className="px-3 py-1.5 rounded border border-gray-300 hover:bg-[var(--bg-subtle)] disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Next
               </button>
               <button
                 onClick={() => setPage(totalPages)}
                 disabled={currentPage === totalPages}
-                className="px-3 py-1.5 rounded border border-gray-300 hover:bg-[#13161c] disabled:opacity-40 disabled:cursor-not-allowed"
+                className="px-3 py-1.5 rounded border border-gray-300 hover:bg-[var(--bg-subtle)] disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Last &raquo;
               </button>

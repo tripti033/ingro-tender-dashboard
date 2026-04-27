@@ -181,7 +181,7 @@ export default function ChecklistCard({
   };
 
   return (
-    <div className="bg-[#1a1d24] rounded-lg border p-5 mb-6">
+    <div className="bg-[var(--bg-card)] rounded-lg border p-5 mb-6">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Submission Checklist</h2>
         {items.length > 0 && (
@@ -216,21 +216,21 @@ export default function ChecklistCard({
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 <button
                   onClick={handleOpenCopyPicker}
-                  className="text-left border rounded-lg p-3 hover:bg-[#13161c] hover:border-[#0D1F3C] transition-colors"
+                  className="text-left border rounded-lg p-3 hover:bg-[var(--bg-subtle)] hover:border-[#0D1F3C] transition-colors"
                 >
                   <div className="text-sm font-medium text-gray-100">Copy from another tender</div>
                   <div className="text-xs text-gray-500 mt-0.5">Pick a tender with an existing checklist. Status resets to pending.</div>
                 </button>
                 <button
                   onClick={() => setMode("template")}
-                  className="text-left border rounded-lg p-3 hover:bg-[#13161c] hover:border-[#0D1F3C] transition-colors"
+                  className="text-left border rounded-lg p-3 hover:bg-[var(--bg-subtle)] hover:border-[#0D1F3C] transition-colors"
                 >
                   <div className="text-sm font-medium text-gray-100">Apply a template</div>
                   <div className="text-xs text-gray-500 mt-0.5">UJVNL Dhakrani, generic BESS, etc.</div>
                 </button>
                 <button
                   onClick={() => { setShowAdd(true); }}
-                  className="text-left border rounded-lg p-3 hover:bg-[#13161c] hover:border-[#0D1F3C] transition-colors"
+                  className="text-left border rounded-lg p-3 hover:bg-[var(--bg-subtle)] hover:border-[#0D1F3C] transition-colors"
                 >
                   <div className="text-sm font-medium text-gray-100">Start blank</div>
                   <div className="text-xs text-gray-500 mt-0.5">Build the checklist yourself from scratch.</div>
@@ -251,7 +251,7 @@ export default function ChecklistCard({
                   key={t.id}
                   onClick={() => handleApplyTemplate(t.id)}
                   disabled={saving}
-                  className="w-full text-left border rounded-lg p-3 hover:bg-[#13161c] disabled:opacity-50 transition-colors"
+                  className="w-full text-left border rounded-lg p-3 hover:bg-[var(--bg-subtle)] disabled:opacity-50 transition-colors"
                 >
                   <div className="text-sm font-medium text-gray-100">{t.name}</div>
                   <div className="text-xs text-gray-500 mt-0.5">{t.description}</div>
@@ -275,7 +275,7 @@ export default function ChecklistCard({
                     key={s.nit}
                     onClick={() => handleCopyFrom(s.nit)}
                     disabled={saving}
-                    className="w-full text-left border rounded-lg p-3 hover:bg-[#13161c] disabled:opacity-50 transition-colors"
+                    className="w-full text-left border rounded-lg p-3 hover:bg-[var(--bg-subtle)] disabled:opacity-50 transition-colors"
                   >
                     <div className="text-sm font-medium text-gray-100 truncate">{s.title || s.nit}</div>
                     <div className="text-xs text-gray-500 mt-0.5">
@@ -379,7 +379,7 @@ function ChecklistRow({
   };
 
   return (
-    <div className={`border rounded-lg ${item.status === "done" ? "bg-green-50/40" : "bg-[#1a1d24]"} transition-colors`}>
+    <div className={`border rounded-lg ${item.status === "done" ? "bg-green-50/40" : "bg-[var(--bg-card)]"} transition-colors`}>
       <div className="flex items-center gap-3 px-3 py-2">
         <button
           onClick={() => onStatus(nextStatus[item.status])}
@@ -409,7 +409,7 @@ function ChecklistRow({
       </div>
 
       {showDetails && (
-        <div className="border-t px-3 py-2 bg-[#13161c] space-y-2">
+        <div className="border-t px-3 py-2 bg-[var(--bg-subtle)] space-y-2">
           <div>
             <label className="block text-[10px] text-gray-400 uppercase tracking-wider mb-1">Remarks</label>
             <textarea

@@ -159,10 +159,10 @@ function ArchivesContent() {
   const pageRows = filtered.slice(pageStart, pageEnd);
 
   return (
-    <div className="min-h-screen bg-[#0d1015] text-gray-100">
+    <div className="min-h-screen bg-[var(--bg-body)] text-gray-100">
       <Sidebar />
 
-      <div className="sidebar-content sticky top-0 z-40 bg-[#1a1d24] border-b px-6 py-3">
+      <div className="sidebar-content sticky top-0 z-40 bg-[var(--bg-card)] border-b px-6 py-3">
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-lg font-bold text-gray-100 mr-2">Archives</h1>
           <input
@@ -212,7 +212,7 @@ function ArchivesContent() {
         ) : (
           <div className="overflow-x-auto rounded-lg border">
             <table className="w-full text-sm">
-              <thead className="bg-[#13161c] text-left text-gray-500 font-medium text-xs uppercase tracking-wider">
+              <thead className="bg-[var(--bg-subtle)] text-left text-gray-500 font-medium text-xs uppercase tracking-wider">
                 <tr>
                   <th className="px-3 py-3 whitespace-nowrap">NIT Number</th>
                   <th className="px-3 py-3">Authority</th>
@@ -230,7 +230,7 @@ function ArchivesContent() {
                   <tr
                     key={t.nitNumber}
                     onClick={() => router.push(`/tender/${encodeURIComponent(t.nitNumber)}?from=/archives`)}
-                    className="hover:bg-[#13161c] cursor-pointer transition-colors text-gray-600"
+                    className="hover:bg-[var(--bg-subtle)] cursor-pointer transition-colors text-gray-600"
                   >
                     <td className="px-3 py-2.5 font-mono text-xs whitespace-nowrap" title={t.nitNumber}>
                       {truncate(t.nitNumber, 25)}
@@ -284,28 +284,28 @@ function ArchivesContent() {
               <button
                 onClick={() => setPage(1)}
                 disabled={currentPage === 1}
-                className="px-3 py-1.5 rounded border border-gray-300 hover:bg-[#13161c] disabled:opacity-40 disabled:cursor-not-allowed"
+                className="px-3 py-1.5 rounded border border-gray-300 hover:bg-[var(--bg-subtle)] disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 &laquo; First
               </button>
               <button
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
-                className="px-3 py-1.5 rounded border border-gray-300 hover:bg-[#13161c] disabled:opacity-40 disabled:cursor-not-allowed"
+                className="px-3 py-1.5 rounded border border-gray-300 hover:bg-[var(--bg-subtle)] disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Prev
               </button>
               <button
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={currentPage === totalPages}
-                className="px-3 py-1.5 rounded border border-gray-300 hover:bg-[#13161c] disabled:opacity-40 disabled:cursor-not-allowed"
+                className="px-3 py-1.5 rounded border border-gray-300 hover:bg-[var(--bg-subtle)] disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Next
               </button>
               <button
                 onClick={() => setPage(totalPages)}
                 disabled={currentPage === totalPages}
-                className="px-3 py-1.5 rounded border border-gray-300 hover:bg-[#13161c] disabled:opacity-40 disabled:cursor-not-allowed"
+                className="px-3 py-1.5 rounded border border-gray-300 hover:bg-[var(--bg-subtle)] disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Last &raquo;
               </button>

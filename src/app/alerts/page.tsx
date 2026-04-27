@@ -68,7 +68,7 @@ function AlertsContent() {
   }, [alerts, search, catFilter, minScore]);
 
   return (
-    <div className="min-h-screen bg-[#0d1015] text-gray-100">
+    <div className="min-h-screen bg-[var(--bg-body)] text-gray-100">
       <Sidebar />
       <div className="sidebar-content px-6 py-6">
         <h1 className="text-xl font-bold text-gray-100 mb-4">Industry Alerts</h1>
@@ -95,7 +95,7 @@ function AlertsContent() {
         ) : (
           <div className="space-y-2">
             {filtered.map((alert) => (
-              <div key={alert.id} className={`bg-[#1a1d24] rounded-lg border p-4 hover:shadow-sm transition-shadow ${
+              <div key={alert.id} className={`bg-[var(--bg-card)] rounded-lg border p-4 hover:shadow-sm transition-shadow ${
                 alert.isTenderAnnouncement ? "border-l-4 border-l-red-500" : ""
               }`}>
                 <div className="flex items-start gap-3">

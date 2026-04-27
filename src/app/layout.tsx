@@ -7,14 +7,29 @@ export const metadata: Metadata = {
     "Track Battery Energy Storage System tenders across Indian government portals",
 };
 
+const themeInitScript = `
+(function() {
+  try {
+    var stored = localStorage.getItem('theme');
+    var theme = stored || 'dark';
+    if (theme === 'light') document.documentElement.classList.add('light');
+  } catch (e) {}
+})();
+`;
+
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className="bg-[#1a1d24] text-gray-100 min-h-screen">{children}</body>
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+      </head>
+      <body className="bg-[var(--bg-body)] text-[var(--text-primary)] min-h-screen">
+        {children}
+      </body>
     </html>
   );
 }

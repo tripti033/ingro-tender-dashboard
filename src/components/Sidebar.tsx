@@ -5,6 +5,7 @@ import { type User } from "firebase/auth";
 import { onAuthChange, signOut } from "@/lib/auth";
 import { useRouter, usePathname } from "next/navigation";
 import ReminderBell from "./ReminderBell";
+import ThemeToggle from "./ThemeToggle";
 
 // SVG icon components — clean, consistent Heroicons-style
 function IconTenders({ className }: { className?: string }) {
@@ -131,6 +132,7 @@ export default function Sidebar() {
           )}
           <div className={`flex items-center gap-1 shrink-0 ${collapsed ? "flex-col" : ""}`}>
             <ReminderBell collapsed={collapsed} />
+            <ThemeToggle collapsed={collapsed} />
             <button
               onClick={() => setCollapsed(!collapsed)}
               className="text-gray-400 hover:text-white p-1.5 rounded hover:bg-white/10 transition-colors"

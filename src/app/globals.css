@@ -2,15 +2,44 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Theme variables ─────────────────────────────────────────────────────
+   Default (no class) = dark theme, but with lighter, softer surfaces.
+   Adding `.light` to <html> swaps to a light theme.
+   ────────────────────────────────────────────────────────────────────── */
+:root {
+  --bg-body:        #1c1f26;
+  --bg-card:        #262a32;
+  --bg-subtle:      #2d313a;
+  --bg-hover:       #323641;
+  --text-primary:   #f3f4f6;
+  --text-secondary: #d1d5db;
+  --text-muted:     #9ca3af;
+  --text-faint:     #6b7280;
+  --border-default: #3a3f49;
+  --border-subtle:  #2d313a;
+}
+
+html.light {
+  --bg-body:        #f9fafb;
+  --bg-card:        #ffffff;
+  --bg-subtle:      #f3f4f6;
+  --bg-hover:       #f3f4f6;
+  --text-primary:   #111827;
+  --text-secondary: #374151;
+  --text-muted:     #6b7280;
+  --text-faint:     #9ca3af;
+  --border-default: #e5e7eb;
+  --border-subtle:  #f3f4f6;
+}
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
     "Helvetica Neue", Arial, sans-serif;
-  background-color: #0d1015;
-  color: #e5e7eb;
+  background-color: var(--bg-body);
+  color: var(--text-primary);
 }
 
-/* Dark-mode adjustments for native form controls so they don't render as
-   bright-white blocks on the dark surface. */
+/* Form-control theming so native fields blend into either palette. */
 input[type="text"],
 input[type="email"],
 input[type="number"],
@@ -21,17 +50,63 @@ input[type="password"],
 input[type="date"],
 select,
 textarea {
-  background-color: #1a1d24;
-  color: #e5e7eb;
-  border-color: #2d3138;
+  background-color: var(--bg-card);
+  color: var(--text-primary);
+  border-color: var(--border-default);
 }
 
 input::placeholder,
 textarea::placeholder {
-  color: #6b7280;
+  color: var(--text-faint);
 }
 
 select option {
-  background-color: #1a1d24;
-  color: #e5e7eb;
+  background-color: var(--bg-card);
+  color: var(--text-primary);
+}
+
+/* ── Light-theme remapping ────────────────────────────────────────────────
+   The app was originally built for a dark palette, so many components use
+   hardcoded `text-gray-100`, `text-gray-300`, `bg-gray-800`, etc. Re-route
+   those to readable values when light theme is active, instead of touching
+   every component file.
+   ────────────────────────────────────────────────────────────────────── */
+html.light .text-gray-100,
+html.light .text-gray-200 {
+  color: #111827 !important;
+}
+html.light .text-gray-300 {
+  color: #374151 !important;
+}
+html.light .text-gray-400 {
+  color: #6b7280 !important;
+}
+html.light .text-gray-500 {
+  color: #6b7280 !important;
+}
+html.light .text-gray-600 {
+  color: #4b5563 !important;
+}
+
+html.light .bg-gray-800,
+html.light .bg-gray-900 {
+  background-color: #f3f4f6 !important;
+}
+html.light .bg-gray-700 {
+  background-color: #e5e7eb !important;
+}
+
+html.light .border-gray-700,
+html.light .border-gray-800 {
+  border-color: #e5e7eb !important;
+}
+
+html.light .divide-gray-700 > :not([hidden]) ~ :not([hidden]),
+html.light .divide-gray-800 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #e5e7eb !important;
+}
+
+html.light .hover\:bg-gray-800:hover,
+html.light .hover\:bg-gray-700:hover {
+  background-color: #f3f4f6 !important;
 }

@@ -73,7 +73,7 @@ function NewTenderContent() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0d1015] text-gray-100">
+    <div className="min-h-screen bg-[var(--bg-body)] text-gray-100">
       <Sidebar />
       <div className="sidebar-content max-w-3xl mx-auto px-6 py-6">
         <button onClick={() => router.push("/dashboard")} className="text-[#0D1F3C] hover:underline text-sm mb-4 inline-block">
@@ -84,7 +84,7 @@ function NewTenderContent() {
 
         {error && <div className="mb-4 bg-red-50 text-red-700 px-4 py-2 rounded-lg text-sm">{error}</div>}
 
-        <div className="bg-[#1a1d24] rounded-lg border p-6 space-y-0">
+        <div className="bg-[var(--bg-card)] rounded-lg border p-6 space-y-0">
           <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Basic Details</h2>
           <Field label="NIT Number"><input type="text" value={f("nitNumber")} onChange={sf("nitNumber")} placeholder="e.g. SECI-2025-TN000015" className={inputClass} /></Field>
           <Field label="Title *"><input type="text" value={f("title")} onChange={sf("title")} placeholder="Tender title" className={inputClass} /></Field>
@@ -131,7 +131,7 @@ function NewTenderContent() {
             {saving ? "Creating..." : "Create Tender"}
           </button>
           <button onClick={() => router.push("/dashboard")}
-            className="border border-gray-300 text-gray-600 px-6 py-2.5 rounded-lg text-sm hover:bg-[#13161c] transition-colors">
+            className="border border-gray-300 text-gray-600 px-6 py-2.5 rounded-lg text-sm hover:bg-[var(--bg-subtle)] transition-colors">
             Cancel
           </button>
         </div>

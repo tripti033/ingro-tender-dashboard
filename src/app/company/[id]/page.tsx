@@ -8,7 +8,7 @@ import Sidebar from "@/components/Sidebar";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="bg-[#1a1d24] rounded-lg border p-5">
+    <div className="bg-[var(--bg-card)] rounded-lg border p-5">
       <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">{title}</h2>
       {children}
     </div>
@@ -48,7 +48,7 @@ function CompanyProfileContent() {
   const lost = bids.filter((b) => b.result === "lost");
 
   if (loading) return (
-    <div className="min-h-screen bg-[#0d1015] text-gray-100"><Sidebar />
+    <div className="min-h-screen bg-[var(--bg-body)] text-gray-100"><Sidebar />
       <div className="sidebar-content flex items-center justify-center py-32">
         <div className="animate-spin rounded-full h-10 w-10 border-4 border-gray-800 border-t-[#0D1F3C]" />
       </div>
@@ -56,7 +56,7 @@ function CompanyProfileContent() {
   );
 
   if (!company) return (
-    <div className="min-h-screen bg-[#0d1015] text-gray-100"><Sidebar />
+    <div className="min-h-screen bg-[var(--bg-body)] text-gray-100"><Sidebar />
       <div className="sidebar-content max-w-4xl mx-auto px-6 py-12">
         <button onClick={() => router.push("/companies")} className="text-[#0D1F3C] hover:underline text-sm mb-6">&larr; All Companies</button>
         <p className="text-red-600">Company not found.</p>
@@ -65,7 +65,7 @@ function CompanyProfileContent() {
   );
 
   return (
-    <div className="min-h-screen bg-[#0d1015] text-gray-100">
+    <div className="min-h-screen bg-[var(--bg-body)] text-gray-100">
       <Sidebar />
       <div className="sidebar-content max-w-6xl mx-auto px-6 py-6">
         <button onClick={() => router.push("/companies")} className="text-[#0D1F3C] hover:underline text-sm mb-4 inline-block">&larr; All Companies</button>
@@ -118,7 +118,7 @@ function CompanyProfileContent() {
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
-                    <thead className="bg-[#13161c] text-left text-gray-500 text-xs uppercase">
+                    <thead className="bg-[var(--bg-subtle)] text-left text-gray-500 text-xs uppercase">
                       <tr>
                         <th className="px-3 py-2">Tender</th>
                         <th className="px-3 py-2">Category</th>
@@ -131,7 +131,7 @@ function CompanyProfileContent() {
                     </thead>
                     <tbody className="divide-y">
                       {filteredBids.map((b) => (
-                        <tr key={b.id} className="hover:bg-[#13161c]">
+                        <tr key={b.id} className="hover:bg-[var(--bg-subtle)]">
                           <td className="px-3 py-2 font-mono text-xs max-w-[200px] truncate" title={b.tenderNit}>
                             {b.tenderName || b.tenderNit || "\u2014"}
                           </td>

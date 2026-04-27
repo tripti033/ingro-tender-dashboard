@@ -91,7 +91,7 @@ function EmployeeDetailContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0d1015] text-gray-100">
+      <div className="min-h-screen bg-[var(--bg-body)] text-gray-100">
         <Sidebar />
         <div className="sidebar-content px-6 py-6">
           <div className="h-64 bg-gray-800 rounded animate-pulse" />
@@ -102,7 +102,7 @@ function EmployeeDetailContent() {
 
   if (notFound || !employee) {
     return (
-      <div className="min-h-screen bg-[#0d1015] text-gray-100">
+      <div className="min-h-screen bg-[var(--bg-body)] text-gray-100">
         <Sidebar />
         <div className="sidebar-content px-6 py-6">
           <button onClick={() => router.push("/employees")} className="text-[#0D1F3C] hover:underline text-sm mb-4 inline-block">
@@ -117,7 +117,7 @@ function EmployeeDetailContent() {
   const initials = employee.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
 
   return (
-    <div className="min-h-screen bg-[#0d1015] text-gray-100">
+    <div className="min-h-screen bg-[var(--bg-body)] text-gray-100">
       <Sidebar />
       <div className="sidebar-content px-6 py-6">
         <button onClick={() => router.push("/employees")} className="text-[#0D1F3C] hover:underline text-sm mb-4 inline-block">
@@ -125,7 +125,7 @@ function EmployeeDetailContent() {
         </button>
 
         {/* Header */}
-        <div className="bg-[#1a1d24] rounded-lg border p-5 mb-6 flex items-start justify-between gap-4">
+        <div className="bg-[var(--bg-card)] rounded-lg border p-5 mb-6 flex items-start justify-between gap-4">
           <div className="flex items-center gap-4">
             <div className="w-14 h-14 rounded-full bg-[#0D1F3C] text-white flex items-center justify-center text-lg font-bold shrink-0">
               {initials}
@@ -148,7 +148,7 @@ function EmployeeDetailContent() {
 
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
-          <div className="bg-[#1a1d24] rounded-lg border p-4">
+          <div className="bg-[var(--bg-card)] rounded-lg border p-4">
             <div className="text-xs text-gray-500 uppercase tracking-wider">Assigned</div>
             <div className="text-xl font-bold text-gray-100 mt-1">{assigned.length}</div>
           </div>
@@ -189,11 +189,11 @@ function EmployeeDetailContent() {
 
         {/* Assigned tenders */}
         {assigned.length === 0 ? (
-          <div className="bg-[#1a1d24] rounded-lg border p-8 text-center text-gray-400">No tenders assigned to this employee</div>
+          <div className="bg-[var(--bg-card)] rounded-lg border p-8 text-center text-gray-400">No tenders assigned to this employee</div>
         ) : (
-          <div className="overflow-x-auto rounded-lg border bg-[#1a1d24]">
+          <div className="overflow-x-auto rounded-lg border bg-[var(--bg-card)]">
             <table className="w-full text-sm">
-              <thead className="bg-[#13161c] text-left text-gray-500 text-xs uppercase tracking-wider">
+              <thead className="bg-[var(--bg-subtle)] text-left text-gray-500 text-xs uppercase tracking-wider">
                 <tr>
                   <th className="px-4 py-3">NIT</th>
                   <th className="px-4 py-3">Title</th>
@@ -216,7 +216,7 @@ function EmployeeDetailContent() {
                         if (e.metaKey || e.ctrlKey) return;
                         window.open(href, "_blank", "noopener,noreferrer");
                       }}
-                      className="hover:bg-[#13161c] cursor-pointer"
+                      className="hover:bg-[var(--bg-subtle)] cursor-pointer"
                     >
                       <td className="px-4 py-2.5 font-mono text-xs whitespace-nowrap" title={t.nitNumber}>
                         {truncate(t.nitNumber, 25)}
