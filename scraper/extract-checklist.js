@@ -260,7 +260,16 @@ async function main() {
     console.log(`${DIM}${(t.title || "").slice(0, 120)}${RESET}`);
     console.log(`  Document: ${t.documentLink.slice(0, 90)}`);
 
-    const pdfText = await downloadPdfText(t.documentLink);
+    // Prefer OCR override (Gemini Vision) if scraper/ocr-ujvnl.js was run on
+    // this tender — overrides garbled pdf-parse output for UJVNL Word-export
+    // PDFs and similar.
+    let pdfText;
+    if (t.pdfTextOverride) {
+      pdfText = t.pdfTextOverride;
+      console.log(`  ${DIM}(using OCR override, ${pdfText.length} chars)${RESET}`);
+    } else {
+      pdfText = await downloadPdfText(t.documentLink);
+    }
     if (!pdfText) { console.log("  → Couldn't read PDF, skipping"); skipped++; continue; }
 
     // Some PDFs (UJVNL Word-export with non-Unicode Devanagari fonts) come

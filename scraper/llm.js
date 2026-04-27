@@ -10,7 +10,7 @@
 
 const OLLAMA_URL = process.env.OLLAMA_URL || "http://localhost:11434";
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "llama3.2:3b";
-const LLM_TIMEOUT_MS = 90000; // 90s — generous for cold model load
+const LLM_TIMEOUT_MS = 180000; // 3 min — generous for cold model + larger prompts
 
 let llmAvailable = null; // cached availability check
 

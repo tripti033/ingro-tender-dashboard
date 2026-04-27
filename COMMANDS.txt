@@ -91,6 +91,22 @@
 
 
 ───────────────────────────────────────────────────────────────────
+  3h. OCR FALLBACK (UJVNL PDFs with non-Unicode Hindi fonts)
+───────────────────────────────────────────────────────────────────
+
+  # UJVNL exports PDFs from MS Word with non-Unicode Devanagari fonts.
+  # Visible text is English but pdf-parse returns gibberish. This
+  # script sends each PDF to Gemini Vision for clean OCR transcription
+  # and stores the result as `pdfTextOverride` on the tender. After
+  # this, extract-checklist + llm-review use the OCRed text instead.
+  node scraper/ocr-ujvnl.js                 # all UJVNL tenders
+  node scraper/ocr-ujvnl.js T-04-EE\\(SOLAR\\)-2025-26   # one specific
+  node scraper/ocr-ujvnl.js --force         # re-OCR even if override exists
+
+  Burns ~1 Gemini call per tender (15s each). 4 UJVNL BESS = 4 calls.
+
+
+───────────────────────────────────────────────────────────────────
   3f. CHECKLIST EXTRACTOR (Ollama reads RfP PDF -> checklist items)
 ───────────────────────────────────────────────────────────────────
 
