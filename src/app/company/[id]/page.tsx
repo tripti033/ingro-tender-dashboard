@@ -8,7 +8,7 @@ import Sidebar from "@/components/Sidebar";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="bg-white rounded-lg border p-5">
+    <div className="bg-[#1a1d24] rounded-lg border p-5">
       <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">{title}</h2>
       {children}
     </div>
@@ -21,7 +21,7 @@ function typeBadge(type: string) {
     Board: "bg-green-100 text-green-800",
     Private: "bg-purple-100 text-purple-800",
   };
-  return colors[type] || "bg-gray-100 text-gray-700";
+  return colors[type] || "bg-gray-800 text-gray-300";
 }
 
 function CompanyProfileContent() {
@@ -48,15 +48,15 @@ function CompanyProfileContent() {
   const lost = bids.filter((b) => b.result === "lost");
 
   if (loading) return (
-    <div className="min-h-screen bg-gray-50"><Sidebar />
+    <div className="min-h-screen bg-[#0d1015] text-gray-100"><Sidebar />
       <div className="sidebar-content flex items-center justify-center py-32">
-        <div className="animate-spin rounded-full h-10 w-10 border-4 border-gray-200 border-t-[#0D1F3C]" />
+        <div className="animate-spin rounded-full h-10 w-10 border-4 border-gray-800 border-t-[#0D1F3C]" />
       </div>
     </div>
   );
 
   if (!company) return (
-    <div className="min-h-screen bg-gray-50"><Sidebar />
+    <div className="min-h-screen bg-[#0d1015] text-gray-100"><Sidebar />
       <div className="sidebar-content max-w-4xl mx-auto px-6 py-12">
         <button onClick={() => router.push("/companies")} className="text-[#0D1F3C] hover:underline text-sm mb-6">&larr; All Companies</button>
         <p className="text-red-600">Company not found.</p>
@@ -65,7 +65,7 @@ function CompanyProfileContent() {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#0d1015] text-gray-100">
       <Sidebar />
       <div className="sidebar-content max-w-6xl mx-auto px-6 py-6">
         <button onClick={() => router.push("/companies")} className="text-[#0D1F3C] hover:underline text-sm mb-4 inline-block">&larr; All Companies</button>
@@ -73,7 +73,7 @@ function CompanyProfileContent() {
         {/* Header */}
         <div className="mb-6">
           <div className="flex items-center gap-3 mb-2">
-            <h1 className="text-2xl font-bold text-gray-900">{company.name}</h1>
+            <h1 className="text-2xl font-bold text-gray-100">{company.name}</h1>
             <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${typeBadge(company.type)}`}>{company.type}</span>
           </div>
           {/* Stats row */}
@@ -87,7 +87,7 @@ function CompanyProfileContent() {
               <div className="text-xs text-gray-500">Bids Lost</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-gray-800">{bids.length}</div>
+              <div className="text-2xl font-bold text-gray-200">{bids.length}</div>
               <div className="text-xs text-gray-500">Total Bids</div>
             </div>
             {company.totalCapacityMWh > 0 && (
@@ -107,7 +107,7 @@ function CompanyProfileContent() {
                 {(["all", "won", "lost"] as const).map((f) => (
                   <button key={f} onClick={() => setBidFilter(f)}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                      bidFilter === f ? "bg-[#0D1F3C] text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      bidFilter === f ? "bg-[#0D1F3C] text-white" : "bg-gray-800 text-gray-600 hover:bg-gray-200"
                     }`}>
                     {f === "all" ? `All (${bids.length})` : f === "won" ? `Won (${won.length})` : `Lost (${lost.length})`}
                   </button>
@@ -118,7 +118,7 @@ function CompanyProfileContent() {
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
-                    <thead className="bg-gray-50 text-left text-gray-500 text-xs uppercase">
+                    <thead className="bg-[#13161c] text-left text-gray-500 text-xs uppercase">
                       <tr>
                         <th className="px-3 py-2">Tender</th>
                         <th className="px-3 py-2">Category</th>
@@ -131,7 +131,7 @@ function CompanyProfileContent() {
                     </thead>
                     <tbody className="divide-y">
                       {filteredBids.map((b) => (
-                        <tr key={b.id} className="hover:bg-gray-50">
+                        <tr key={b.id} className="hover:bg-[#13161c]">
                           <td className="px-3 py-2 font-mono text-xs max-w-[200px] truncate" title={b.tenderNit}>
                             {b.tenderName || b.tenderNit || "\u2014"}
                           </td>
@@ -162,7 +162,7 @@ function CompanyProfileContent() {
               ) : (
                 <div className="space-y-3">
                   {contacts.map((c) => (
-                    <div key={c.id} className="border-b border-gray-100 pb-3 last:border-0">
+                    <div key={c.id} className="border-b border-gray-800 pb-3 last:border-0">
                       <div className="font-medium text-sm">{c.name}</div>
                       {c.designation && <div className="text-xs text-gray-500">{c.designation}</div>}
                       {c.email && <a href={`mailto:${c.email}`} className="text-xs text-blue-600 hover:underline block">{c.email}</a>}

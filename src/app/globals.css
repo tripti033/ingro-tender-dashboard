@@ -5,4 +5,33 @@
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
     "Helvetica Neue", Arial, sans-serif;
+  background-color: #0d1015;
+  color: #e5e7eb;
+}
+
+/* Dark-mode adjustments for native form controls so they don't render as
+   bright-white blocks on the dark surface. */
+input[type="text"],
+input[type="email"],
+input[type="number"],
+input[type="search"],
+input[type="tel"],
+input[type="url"],
+input[type="password"],
+input[type="date"],
+select,
+textarea {
+  background-color: #1a1d24;
+  color: #e5e7eb;
+  border-color: #2d3138;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #6b7280;
+}
+
+select option {
+  background-color: #1a1d24;
+  color: #e5e7eb;
 }

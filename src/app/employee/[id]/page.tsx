@@ -30,7 +30,7 @@ function liveDaysLeft(t: Tender): number | null {
 function statusLabel(t: Tender): { label: string; color: string } {
   const days = liveDaysLeft(t);
   if (t.tenderStatus === "awarded") return { label: "awarded", color: "bg-teal-100 text-teal-800" };
-  if (t.tenderStatus === "cancelled") return { label: "cancelled", color: "bg-gray-100 text-gray-600" };
+  if (t.tenderStatus === "cancelled") return { label: "cancelled", color: "bg-gray-700 text-gray-300" };
   if (days != null && days < 0) return { label: "closed", color: "bg-red-100 text-red-700" };
   if (days != null && days <= 7) return { label: "closing_soon", color: "bg-amber-100 text-amber-800" };
   return { label: "active", color: "bg-green-100 text-green-800" };
@@ -91,10 +91,10 @@ function EmployeeDetailContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-[#0d1015] text-gray-100">
         <Sidebar />
         <div className="sidebar-content px-6 py-6">
-          <div className="h-64 bg-gray-100 rounded animate-pulse" />
+          <div className="h-64 bg-gray-800 rounded animate-pulse" />
         </div>
       </div>
     );
@@ -102,7 +102,7 @@ function EmployeeDetailContent() {
 
   if (notFound || !employee) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-[#0d1015] text-gray-100">
         <Sidebar />
         <div className="sidebar-content px-6 py-6">
           <button onClick={() => router.push("/employees")} className="text-[#0D1F3C] hover:underline text-sm mb-4 inline-block">
@@ -117,7 +117,7 @@ function EmployeeDetailContent() {
   const initials = employee.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#0d1015] text-gray-100">
       <Sidebar />
       <div className="sidebar-content px-6 py-6">
         <button onClick={() => router.push("/employees")} className="text-[#0D1F3C] hover:underline text-sm mb-4 inline-block">
@@ -125,13 +125,13 @@ function EmployeeDetailContent() {
         </button>
 
         {/* Header */}
-        <div className="bg-white rounded-lg border p-5 mb-6 flex items-start justify-between gap-4">
+        <div className="bg-[#1a1d24] rounded-lg border p-5 mb-6 flex items-start justify-between gap-4">
           <div className="flex items-center gap-4">
             <div className="w-14 h-14 rounded-full bg-[#0D1F3C] text-white flex items-center justify-center text-lg font-bold shrink-0">
               {initials}
             </div>
             <div>
-              <h1 className="text-xl font-bold text-gray-900">{employee.name}</h1>
+              <h1 className="text-xl font-bold text-gray-100">{employee.name}</h1>
               <div className="text-sm text-gray-500 mt-0.5">
                 {[employee.role, employee.department].filter(Boolean).join(" \u00B7 ") || "No role set"}
               </div>
@@ -148,9 +148,9 @@ function EmployeeDetailContent() {
 
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
-          <div className="bg-white rounded-lg border p-4">
+          <div className="bg-[#1a1d24] rounded-lg border p-4">
             <div className="text-xs text-gray-500 uppercase tracking-wider">Assigned</div>
-            <div className="text-xl font-bold text-gray-900 mt-1">{assigned.length}</div>
+            <div className="text-xl font-bold text-gray-100 mt-1">{assigned.length}</div>
           </div>
           <div className="bg-green-50 rounded-lg border border-green-100 p-4">
             <div className="text-xs text-green-700 uppercase tracking-wider">Active</div>
@@ -189,11 +189,11 @@ function EmployeeDetailContent() {
 
         {/* Assigned tenders */}
         {assigned.length === 0 ? (
-          <div className="bg-white rounded-lg border p-8 text-center text-gray-400">No tenders assigned to this employee</div>
+          <div className="bg-[#1a1d24] rounded-lg border p-8 text-center text-gray-400">No tenders assigned to this employee</div>
         ) : (
-          <div className="overflow-x-auto rounded-lg border bg-white">
+          <div className="overflow-x-auto rounded-lg border bg-[#1a1d24]">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 text-left text-gray-500 text-xs uppercase tracking-wider">
+              <thead className="bg-[#13161c] text-left text-gray-500 text-xs uppercase tracking-wider">
                 <tr>
                   <th className="px-4 py-3">NIT</th>
                   <th className="px-4 py-3">Title</th>
@@ -216,7 +216,7 @@ function EmployeeDetailContent() {
                         if (e.metaKey || e.ctrlKey) return;
                         window.open(href, "_blank", "noopener,noreferrer");
                       }}
-                      className="hover:bg-gray-50 cursor-pointer"
+                      className="hover:bg-[#13161c] cursor-pointer"
                     >
                       <td className="px-4 py-2.5 font-mono text-xs whitespace-nowrap" title={t.nitNumber}>
                         {truncate(t.nitNumber, 25)}

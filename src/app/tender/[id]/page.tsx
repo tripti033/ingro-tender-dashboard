@@ -15,9 +15,9 @@ import ComparableTendersCard from "@/components/ComparableTendersCard";
 const FLAG_OPTIONS = [
   { label: "Watching", color: "border-blue-500 bg-blue-50 text-blue-700" },
   { label: "Applying", color: "border-green-500 bg-green-50 text-green-700" },
-  { label: "Not Interested", color: "border-gray-400 bg-gray-50 text-gray-600" },
+  { label: "Not Interested", color: "border-gray-400 bg-[#13161c] text-gray-600" },
   { label: "Don\u2019t Qualify", color: "border-red-400 bg-red-50 text-red-700" },
-  { label: "Expired", color: "border-gray-400 bg-gray-50 text-gray-500" },
+  { label: "Expired", color: "border-gray-400 bg-[#13161c] text-gray-500" },
 ];
 
 const STATUS_PIPELINE = [
@@ -80,7 +80,7 @@ function formatINR(val: number | null): string {
 function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = { active: "bg-green-100 text-green-800", closing_soon: "bg-amber-100 text-amber-800", closed: "bg-red-100 text-red-800", awarded: "bg-blue-100 text-blue-800" };
   const labels: Record<string, string> = { active: "Active", closing_soon: "Closing Soon", closed: "Closed", awarded: "Awarded" };
-  return <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${styles[status] || "bg-gray-100 text-gray-700"}`}>{labels[status] || status}</span>;
+  return <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${styles[status] || "bg-gray-800 text-gray-300"}`}>{labels[status] || status}</span>;
 }
 
 // ── Display Row (view mode) ──
@@ -106,7 +106,7 @@ function safeRenderValue(v: React.ReactNode): React.ReactNode {
 function Row({ label, value, highlight }: { label: string; value: React.ReactNode; highlight?: boolean }) {
   const rendered = safeRenderValue(value);
   return (
-    <div className={`flex justify-between py-2.5 border-b border-gray-100 ${highlight ? "bg-yellow-50 -mx-5 px-5" : ""}`}>
+    <div className={`flex justify-between py-2.5 border-b border-gray-800 ${highlight ? "bg-yellow-50 -mx-5 px-5" : ""}`}>
       <span className="text-gray-500 text-sm">{label}</span>
       <span className="text-sm font-medium text-right max-w-[60%]">{rendered || "\u2014"}</span>
     </div>
@@ -117,7 +117,7 @@ function Row({ label, value, highlight }: { label: string; value: React.ReactNod
 
 function EditText({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string }) {
   return (
-    <div className="flex items-center justify-between py-2 border-b border-gray-100 gap-3">
+    <div className="flex items-center justify-between py-2 border-b border-gray-800 gap-3">
       <label className="text-gray-500 text-sm shrink-0">{label}</label>
       <input type="text" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder || "\u2014"}
         className="text-sm font-medium text-right border rounded px-2 py-1.5 w-48 focus:outline-none focus:ring-2 focus:ring-[#0D1F3C]/20" />
@@ -127,7 +127,7 @@ function EditText({ label, value, onChange, placeholder }: { label: string; valu
 
 function EditNumber({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string }) {
   return (
-    <div className="flex items-center justify-between py-2 border-b border-gray-100 gap-3">
+    <div className="flex items-center justify-between py-2 border-b border-gray-800 gap-3">
       <label className="text-gray-500 text-sm shrink-0">{label}</label>
       <input type="number" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder || "0"} step="any"
         className="text-sm font-medium text-right border rounded px-2 py-1.5 w-48 focus:outline-none focus:ring-2 focus:ring-[#0D1F3C]/20" />
@@ -137,7 +137,7 @@ function EditNumber({ label, value, onChange, placeholder }: { label: string; va
 
 function EditSelect({ label, value, onChange, options }: { label: string; value: string; onChange: (v: string) => void; options: string[] }) {
   return (
-    <div className="flex items-center justify-between py-2 border-b border-gray-100 gap-3">
+    <div className="flex items-center justify-between py-2 border-b border-gray-800 gap-3">
       <label className="text-gray-500 text-sm shrink-0">{label}</label>
       <select value={value} onChange={(e) => onChange(e.target.value)}
         className="text-sm font-medium text-right border rounded px-2 py-1.5 w-48 focus:outline-none focus:ring-2 focus:ring-[#0D1F3C]/20">
@@ -150,7 +150,7 @@ function EditSelect({ label, value, onChange, options }: { label: string; value:
 
 function EditDate({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   return (
-    <div className="flex items-center justify-between py-2 border-b border-gray-100 gap-3">
+    <div className="flex items-center justify-between py-2 border-b border-gray-800 gap-3">
       <label className="text-gray-500 text-sm shrink-0">{label}</label>
       <input type="date" value={value} onChange={(e) => onChange(e.target.value)}
         className="text-sm font-medium text-right border rounded px-2 py-1.5 w-48 focus:outline-none focus:ring-2 focus:ring-[#0D1F3C]/20" />
@@ -160,7 +160,7 @@ function EditDate({ label, value, onChange }: { label: string; value: string; on
 
 function Section({ title, children, action }: { title: string; children: React.ReactNode; action?: React.ReactNode }) {
   return (
-    <div className="bg-white rounded-lg border p-5">
+    <div className="bg-[#1a1d24] rounded-lg border p-5">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{title}</h2>
         {action}
@@ -415,13 +415,13 @@ function TenderDetailContent() {
     try { await updateNote(tender.nitNumber, user.uid, noteText); setNoteSaved(true); setTimeout(() => setNoteSaved(false), 2000); } catch { /* */ }
   };
 
-  if (loading) return <div className="min-h-screen bg-gray-50"><Sidebar /><div className="sidebar-content flex items-center justify-center py-32"><div className="animate-spin rounded-full h-10 w-10 border-4 border-gray-200 border-t-[#0D1F3C]" /></div></div>;
+  if (loading) return <div className="min-h-screen bg-[#0d1015] text-gray-100"><Sidebar /><div className="sidebar-content flex items-center justify-center py-32"><div className="animate-spin rounded-full h-10 w-10 border-4 border-gray-800 border-t-[#0D1F3C]" /></div></div>;
 
   if (error || !tender) return (
-    <div className="min-h-screen bg-gray-50"><Sidebar /><div className="sidebar-content max-w-2xl mx-auto px-6 py-16">
+    <div className="min-h-screen bg-[#0d1015] text-gray-100"><Sidebar /><div className="sidebar-content max-w-2xl mx-auto px-6 py-16">
       <button onClick={() => router.push(back.href)} className="text-[#0D1F3C] hover:underline text-sm mb-6">&larr; {back.label}</button>
-      <div className="bg-white border rounded-lg p-8 text-center">
-        <div className="text-lg font-semibold text-gray-900 mb-2">Tender not found</div>
+      <div className="bg-[#1a1d24] border rounded-lg p-8 text-center">
+        <div className="text-lg font-semibold text-gray-100 mb-2">Tender not found</div>
         <div className="text-sm text-gray-500 mb-4">
           This tender doesn't exist in the database, or the link points to an outdated ID.
           If you got here from a &quot;View parent&quot; button on a corrigendum, the parent tender
@@ -435,7 +435,7 @@ function TenderDetailContent() {
   const t = tender;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#0d1015] text-gray-100">
       <Sidebar />
       <div className="sidebar-content max-w-7xl mx-auto px-6 py-6">
         <div className="flex items-center justify-between mb-4">
@@ -446,7 +446,7 @@ function TenderDetailContent() {
             </button>
           ) : (
             <div className="flex items-center gap-3">
-              <button onClick={() => setEditing(false)} className="border border-gray-300 text-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-gray-50">Cancel</button>
+              <button onClick={() => setEditing(false)} className="border border-gray-300 text-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-[#13161c]">Cancel</button>
               <button onClick={handleSave} disabled={saving}
                 className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700 disabled:opacity-50 transition-colors">
                 {saving ? "Saving..." : "Save Changes"}
@@ -459,10 +459,10 @@ function TenderDetailContent() {
 
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">{t.title || t.nitNumber}</h1>
+          <h1 className="text-2xl font-bold text-gray-100 mb-2">{t.title || t.nitNumber}</h1>
           <div className="flex items-center gap-3 flex-wrap">
             <code onClick={() => { navigator.clipboard.writeText(id); setCopied(true); setTimeout(() => setCopied(false), 1500); }}
-              className="text-sm bg-gray-100 px-3 py-1 rounded font-mono cursor-pointer hover:bg-gray-200" title="Click to copy">{t.nitNumber}</code>
+              className="text-sm bg-gray-800 px-3 py-1 rounded font-mono cursor-pointer hover:bg-gray-200" title="Click to copy">{t.nitNumber}</code>
             {copied && <span className="text-xs text-green-600">Copied!</span>}
             <StatusBadge status={t.tenderStatus} />
             {t.daysLeft != null && t.daysLeft >= 0 && <span className="text-sm text-gray-500">{t.daysLeft} days left</span>}
@@ -482,9 +482,9 @@ function TenderDetailContent() {
                     setTender({ ...t, tenderStatus: s.value });
                   }}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all whitespace-nowrap ${
-                    isActive ? `${s.color} text-white shadow-sm` : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                    isActive ? `${s.color} text-white shadow-sm` : "bg-gray-800 text-gray-500 hover:bg-gray-200"
                   }`}>
-                  {isActive && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
+                  {isActive && <span className="w-1.5 h-1.5 rounded-full bg-[#1a1d24]" />}
                   {s.label}
                 </button>
               );
@@ -509,7 +509,7 @@ function TenderDetailContent() {
                 setTender({ ...t, assignedTo: prev });        // revert on failure
               }
             }}
-            className="text-sm border rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-[#0D1F3C]/20"
+            className="text-sm border rounded-lg px-3 py-1.5 bg-[#1a1d24] focus:outline-none focus:ring-2 focus:ring-[#0D1F3C]/20"
           >
             <option value="">— Unassigned —</option>
             {employeeNames.map((n) => (<option key={n} value={n}>{n}</option>))}
@@ -529,7 +529,7 @@ function TenderDetailContent() {
         {t.summary && (
           <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-5">
             <h2 className="text-xs font-semibold text-blue-600 uppercase tracking-wider mb-2">AI Summary</h2>
-            <p className="text-sm text-gray-700 leading-relaxed">{t.summary}</p>
+            <p className="text-sm text-gray-300 leading-relaxed">{t.summary}</p>
           </div>
         )}
 
@@ -557,7 +557,7 @@ function TenderDetailContent() {
 
         {/* Corrigenda issued against this tender */}
         {corrigenda.length > 0 && (
-          <div className="mb-6 bg-white border rounded-lg p-5">
+          <div className="mb-6 bg-[#1a1d24] border rounded-lg p-5">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Corrigenda ({corrigenda.length})</h2>
             </div>
@@ -565,7 +565,7 @@ function TenderDetailContent() {
               {corrigenda.map((c) => (
                 <div key={c.id} className="border-l-2 border-amber-300 pl-3 py-1">
                   <div className="flex items-start justify-between gap-3 mb-1">
-                    <div className="text-sm font-medium text-gray-900">{c.title}</div>
+                    <div className="text-sm font-medium text-gray-100">{c.title}</div>
                     <span className="text-xs text-gray-400 whitespace-nowrap">
                       {c.issuedAt && typeof c.issuedAt.toDate === "function"
                         ? c.issuedAt.toDate().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
@@ -573,7 +573,7 @@ function TenderDetailContent() {
                     </span>
                   </div>
                   {c.summary && (
-                    <p className="text-sm text-gray-700 leading-relaxed mb-1">{c.summary}</p>
+                    <p className="text-sm text-gray-300 leading-relaxed mb-1">{c.summary}</p>
                   )}
                   {c.changes && c.changes.length > 0 && (
                     <ul className="text-xs text-gray-600 space-y-0.5 mb-1 font-mono">
@@ -635,7 +635,7 @@ function TenderDetailContent() {
                   {t.awardedTo && <Row label="Awarded To" value={<span className="text-green-700 font-medium">{t.awardedTo}</span>} />}
                   {t.developedBy && <Row label="Developed By" value={<span className="text-blue-700 font-medium">{t.developedBy}</span>} />}
                   {t.resultSources && t.resultSources.length > 0 && (
-                    <div className="py-2.5 border-b border-gray-100">
+                    <div className="py-2.5 border-b border-gray-800">
                       <div className="text-gray-500 text-sm mb-1">Result Sources</div>
                       <div className="flex flex-col gap-1">
                         {t.resultSources.map((s, i) => {
@@ -719,7 +719,7 @@ function TenderDetailContent() {
                 {t.documents && t.documents.length > 0 ? (
                   <div className="space-y-2 mb-4">
                     {t.documents.map((d, i) => (
-                      <div key={i} className="flex items-center justify-between py-1.5 border-b border-gray-100 last:border-0">
+                      <div key={i} className="flex items-center justify-between py-1.5 border-b border-gray-800 last:border-0">
                         <a href={d.url} target="_blank" rel="noopener noreferrer"
                           className="text-sm text-[#0D1F3C] hover:underline flex items-center gap-1.5 min-w-0">
                           <span className="shrink-0">{d.name.endsWith(".pdf") ? "\uD83D\uDCC4" : "\uD83D\uDCCE"}</span>
@@ -739,7 +739,7 @@ function TenderDetailContent() {
                 ) : null}
                 {/* Other links */}
                 <div className="flex flex-wrap gap-3">
-                  {t.preBidLink && <a href={t.preBidLink} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 border border-[#0D1F3C] text-[#0D1F3C] px-4 py-2 rounded-lg text-sm hover:bg-gray-50">Pre-bid Meeting &rarr;</a>}
+                  {t.preBidLink && <a href={t.preBidLink} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 border border-[#0D1F3C] text-[#0D1F3C] px-4 py-2 rounded-lg text-sm hover:bg-[#13161c]">Pre-bid Meeting &rarr;</a>}
                   {t.sourceUrl && <a href={t.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-[#0D1F3C] hover:underline py-2">View Source &rarr;</a>}
                 </div>
               </Section>
@@ -812,7 +812,7 @@ function TenderDetailContent() {
               <Section title={`Bids (${tenderBids.length})`}>
                 <div className="space-y-2 max-h-64 overflow-y-auto">
                   {tenderBids.map((b) => (
-                    <div key={b.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
+                    <div key={b.id} className="flex items-center justify-between py-2 border-b border-gray-800 last:border-0">
                       <div>
                         <button onClick={() => router.push(`/company/${encodeURIComponent(b.companyId)}`)}
                           className="text-sm font-medium text-[#0D1F3C] hover:underline">{b.companyName}</button>
@@ -835,7 +835,7 @@ function TenderDetailContent() {
               <div className="space-y-2">
                 {FLAG_OPTIONS.map((opt) => (
                   <button key={opt.label} onClick={() => handleFlagSelect(opt.label)}
-                    className={`w-full text-left px-4 py-2.5 rounded-lg border-2 text-sm font-medium transition-all ${selectedFlag === opt.label ? opt.color : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"}`}>
+                    className={`w-full text-left px-4 py-2.5 rounded-lg border-2 text-sm font-medium transition-all ${selectedFlag === opt.label ? opt.color : "border-gray-800 bg-[#1a1d24] text-gray-600 hover:border-gray-300"}`}>
                     {opt.label}
                   </button>
                 ))}
@@ -854,7 +854,7 @@ function TenderDetailContent() {
 
             <Section title="Sources">
               <div className="flex flex-wrap gap-2">
-                {(t.sources || []).map((src) => <span key={src} className="inline-block px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">{src}</span>)}
+                {(t.sources || []).map((src) => <span key={src} className="inline-block px-3 py-1 rounded-full text-xs font-medium bg-gray-800 text-gray-300">{src}</span>)}
               </div>
             </Section>
 
@@ -868,9 +868,9 @@ function TenderDetailContent() {
               <Section title={`Recent Edits (${editHistory.length})`}>
                 <div className="space-y-3 max-h-80 overflow-y-auto">
                   {editHistory.map((entry) => (
-                    <div key={entry.id} className="border-b border-gray-100 pb-3 last:border-0">
+                    <div key={entry.id} className="border-b border-gray-800 pb-3 last:border-0">
                       <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-xs font-medium text-gray-700">
+                        <span className="text-xs font-medium text-gray-300">
                           {entry.editedBy}
                         </span>
                         <span className="text-xs text-gray-400">
@@ -915,10 +915,10 @@ export default function TenderDetailPage() {
   return (
     <AuthGuard>
       <Suspense fallback={
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen bg-[#0d1015] text-gray-100">
           <Sidebar />
           <div className="sidebar-content flex items-center justify-center py-32">
-            <div className="animate-spin rounded-full h-10 w-10 border-4 border-gray-200 border-t-[#0D1F3C]" />
+            <div className="animate-spin rounded-full h-10 w-10 border-4 border-gray-800 border-t-[#0D1F3C]" />
           </div>
         </div>
       }>

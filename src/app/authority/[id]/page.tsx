@@ -22,7 +22,7 @@ function truncate(str: string | null, max: number): string {
 function statusLabel(t: Tender): { label: string; color: string } {
   const days = liveDaysLeft(t);
   if (t.tenderStatus === "awarded") return { label: "awarded", color: "bg-teal-100 text-teal-800" };
-  if (t.tenderStatus === "cancelled") return { label: "cancelled", color: "bg-gray-100 text-gray-600" };
+  if (t.tenderStatus === "cancelled") return { label: "cancelled", color: "bg-gray-700 text-gray-300" };
   if (days != null && days < 0) return { label: "closed", color: "bg-red-100 text-red-700" };
   if (days != null && days <= 7) return { label: "closing_soon", color: "bg-amber-100 text-amber-800" };
   return { label: "active", color: "bg-green-100 text-green-800" };
@@ -76,27 +76,27 @@ function AuthorityDetailContent() {
   }, [authTenders]);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#0d1015] text-gray-100">
       <Sidebar />
       <div className="sidebar-content px-6 py-6">
         <button onClick={() => router.push("/authorities")} className="text-[#0D1F3C] hover:underline text-sm mb-4 inline-block">
           &larr; All Authorities
         </button>
 
-        <h1 className="text-2xl font-bold text-gray-900 mb-1">{authorityId}</h1>
+        <h1 className="text-2xl font-bold text-gray-100 mb-1">{authorityId}</h1>
         <p className="text-sm text-gray-500 mb-6">Authority details and tenders</p>
 
         {loading ? (
-          <div className="h-64 bg-gray-100 rounded animate-pulse" />
+          <div className="h-64 bg-gray-800 rounded animate-pulse" />
         ) : authTenders.length === 0 ? (
           <div className="text-center py-16 text-gray-400">No tenders found for this authority</div>
         ) : (
           <>
             {/* Stats */}
             <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-6">
-              <div className="bg-white rounded-lg border p-4">
+              <div className="bg-[#1a1d24] rounded-lg border p-4">
                 <div className="text-xs text-gray-500 uppercase tracking-wider">Total</div>
-                <div className="text-xl font-bold text-gray-900 mt-1">{authTenders.length}</div>
+                <div className="text-xl font-bold text-gray-100 mt-1">{authTenders.length}</div>
               </div>
               <div className="bg-green-50 rounded-lg border border-green-100 p-4">
                 <div className="text-xs text-green-700 uppercase tracking-wider">Active</div>
@@ -110,13 +110,13 @@ function AuthorityDetailContent() {
                 <div className="text-xs text-red-700 uppercase tracking-wider">Closed</div>
                 <div className="text-xl font-bold text-red-900 mt-1">{stats.closed}</div>
               </div>
-              <div className="bg-white rounded-lg border p-4">
+              <div className="bg-[#1a1d24] rounded-lg border p-4">
                 <div className="text-xs text-gray-500 uppercase tracking-wider">Total MW</div>
-                <div className="text-xl font-bold text-gray-900 mt-1">{stats.totalMW.toLocaleString()}</div>
+                <div className="text-xl font-bold text-gray-100 mt-1">{stats.totalMW.toLocaleString()}</div>
               </div>
-              <div className="bg-white rounded-lg border p-4">
+              <div className="bg-[#1a1d24] rounded-lg border p-4">
                 <div className="text-xs text-gray-500 uppercase tracking-wider">Total MWh</div>
-                <div className="text-xl font-bold text-gray-900 mt-1">{stats.totalMWh.toLocaleString()}</div>
+                <div className="text-xl font-bold text-gray-100 mt-1">{stats.totalMWh.toLocaleString()}</div>
               </div>
             </div>
 
@@ -137,9 +137,9 @@ function AuthorityDetailContent() {
               <span className="text-sm text-gray-400 ml-auto">{visible.length} of {authTenders.length}</span>
             </div>
 
-            <div className="overflow-x-auto rounded-lg border bg-white">
+            <div className="overflow-x-auto rounded-lg border bg-[#1a1d24]">
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-left text-gray-500 text-xs uppercase tracking-wider">
+                <thead className="bg-[#13161c] text-left text-gray-500 text-xs uppercase tracking-wider">
                   <tr>
                     <th className="px-4 py-3">NIT</th>
                     <th className="px-4 py-3">Title</th>
@@ -164,7 +164,7 @@ function AuthorityDetailContent() {
                           if (e.metaKey || e.ctrlKey) return;
                           window.open(href, "_blank", "noopener,noreferrer");
                         }}
-                        className="hover:bg-gray-50 cursor-pointer"
+                        className="hover:bg-[#13161c] cursor-pointer"
                       >
                         <td className="px-4 py-2.5 font-mono text-xs whitespace-nowrap" title={t.nitNumber}>
                           {truncate(t.nitNumber, 25)}

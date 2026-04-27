@@ -33,7 +33,7 @@ function ChecklistPageContent() {
   }, [id]);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#0d1015] text-gray-100">
       <Sidebar />
       <div className="sidebar-content max-w-4xl mx-auto px-6 py-6">
         <button
@@ -44,14 +44,14 @@ function ChecklistPageContent() {
         </button>
 
         {loading ? (
-          <div className="h-64 bg-gray-100 rounded animate-pulse" />
+          <div className="h-64 bg-gray-800 rounded animate-pulse" />
         ) : !tender ? (
           <div className="text-center py-16 text-gray-400">Tender not found</div>
         ) : (
           <>
             <div className="mb-6">
               <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Submission checklist</div>
-              <h1 className="text-xl font-bold text-gray-900 leading-snug">{tender.title || tender.nitNumber}</h1>
+              <h1 className="text-xl font-bold text-gray-100 leading-snug">{tender.title || tender.nitNumber}</h1>
               <div className="text-sm text-gray-500 mt-1">
                 <span className="font-mono">{tender.nitNumber}</span>
                 {tender.authority && <span> &middot; {tender.authority}</span>}
