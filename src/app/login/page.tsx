@@ -14,7 +14,7 @@ export default function LoginPage() {
   useEffect(() => {
     return onAuthChange((user) => {
       if (user) {
-        router.replace("/dashboard");
+        router.replace("/home");
       } else {
         setLoading(false);
       }
@@ -26,7 +26,7 @@ export default function LoginPage() {
     setSigningIn(true);
     try {
       await signInWithGoogle();
-      router.replace("/dashboard");
+      router.replace("/home");
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : "Sign in failed. Please try again.";
