@@ -234,7 +234,21 @@ export async function writeTenders(tenders) {
           "sourceUrl",
           "isCorrigendum",
           "corrigendumOf",
+          // Contacts. When a source scraper sets these (HPPCL/NTPC pull
+          // them off a structured listing table) the value is more
+          // reliable than whatever the LLM later extracts from the PDF.
+          "contactPerson",
+          "contactEmail",
+          "contactPhone",
         ];
+
+        // Fields where a scraper-provided value should overwrite whatever
+        // is in Firestore — used for live status fields and for contacts
+        // that come from authoritative, structured listing pages.
+        const trustSourceFields = new Set([
+          "daysLeft", "tenderStatus", "sourceUrl", "documentLink", "documents",
+          "contactPerson", "contactEmail", "contactPhone",
+        ]);
 
         let hasChanges = false;
         for (const field of fieldsToCheck) {
@@ -242,8 +256,7 @@ export async function writeTenders(tenders) {
             updates[field] = tender[field];
             hasChanges = true;
           }
-          // Always update dynamic fields, URLs, and documents
-          if (["daysLeft", "tenderStatus", "sourceUrl", "documentLink", "documents"].includes(field)) {
+          if (trustSourceFields.has(field)) {
             if (tender[field] != null && tender[field] !== existing[field]) {
               updates[field] = tender[field];
               hasChanges = true;

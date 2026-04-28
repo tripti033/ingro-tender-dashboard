@@ -141,6 +141,20 @@ export async function scrapeHppcl() {
 
             tender.description = details["Tender Title"] || tender.title;
 
+            // Listing-page contacts. HPPCL prints the named officer + their
+            // direct email/phone in a structured table on every detail page,
+            // so prefer this over whatever the LLM scrapes from the PDF
+            // (which often picks up generic dgm_elect@hppcl.in style boxes).
+            const contactPerson = details["Contact Person"] || null;
+            const contactEmail = details["Email Id"] || details["Email"] || null;
+            const contactPhone = details["Mobile No."] || details["Mobile No"] || details["Phone No."] || details["Phone No"] || null;
+            if (contactPerson) tender.contactPerson = contactPerson;
+            if (contactEmail && /@/.test(contactEmail)) tender.contactEmail = contactEmail;
+            if (contactPhone && /\d/.test(contactPhone)) {
+              const digits = String(contactPhone).replace(/\D/g, "");
+              if (digits.length >= 8 && digits.length <= 15) tender.contactPhone = digits;
+            }
+
             // Documents
             const docs = details._documents || [];
             if (docs.length > 0) {
