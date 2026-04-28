@@ -238,7 +238,7 @@ function DashboardContent() {
 
       {/* Filter bar */}
       <div className="sidebar-content sticky top-0 z-40 bg-[var(--bg-card)] border-b px-6 py-3">
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-end gap-3">
           <input
             type="text"
             placeholder="Search NIT, authority, location..."
@@ -270,16 +270,16 @@ function DashboardContent() {
               {SORT_OPTIONS.map((s) => (<option key={s}>{s}</option>))}
             </select>
           </div>
-          <span className="text-sm text-gray-400 ml-auto">
-            {mainTenders.length === 0
-              ? `0 of ${tenders.length}`
-              : `Showing ${pageStart + 1}\u2013${pageEnd} of ${mainTenders.length}${mainTenders.length !== tenders.length ? ` (filtered from ${tenders.length})` : ""}`}
-            {alertDrafts.length > 0 && ` \u00b7 ${alertDrafts.length} draft${alertDrafts.length === 1 ? "" : "s"}`}
-          </span>
           <button onClick={() => router.push("/tender/new")}
-            className="bg-[#0D1F3C] text-white px-3 py-2 rounded-lg text-sm hover:bg-[#162d52] transition-colors">
+            className="ml-auto shrink-0 bg-[#0D1F3C] text-white px-3 py-2 rounded-lg text-sm hover:bg-[#162d52] transition-colors">
             + New Tender
           </button>
+        </div>
+        <div className="text-xs text-gray-400 mt-2">
+          {mainTenders.length === 0
+            ? `0 of ${tenders.length}`
+            : `Showing ${pageStart + 1}\u2013${pageEnd} of ${mainTenders.length}${mainTenders.length !== tenders.length ? ` (filtered from ${tenders.length})` : ""}`}
+          {alertDrafts.length > 0 && ` \u00b7 ${alertDrafts.length} draft${alertDrafts.length === 1 ? "" : "s"}`}
         </div>
       </div>
 
