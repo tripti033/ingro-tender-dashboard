@@ -13,7 +13,7 @@ const AUTHORITIES = [
   "TNGECL", "SJVNL", "DHBVN", "WBSEDCL", "MSETCL", "GeM", "Others",
 ];
 const CATEGORIES = ["All", "Standalone", "FDRE", "S+S", "PSP", "Hybrid", "Pump Storage Plant"];
-const STATUSES = ["All", "Active", "Closing Soon"];
+const STATUSES = ["All", "Active", "Closing Soon", "Closed"];
 const SORT_OPTIONS = [
   "Days Left (asc)",
   "Bid Deadline (asc)",
@@ -148,13 +148,26 @@ function DashboardContent() {
   }, [search, category, authority, status, sortBy]);
 
   const filtered = useMemo(() => {
-    // Exclude anything that belongs in /archives: closed, awarded, cancelled,
-    // or whose deadline has passed (stale status field).
-    let result = tenders.filter((t) => {
-      if (t.tenderStatus === "closed" || t.tenderStatus === "awarded" || t.tenderStatus === "cancelled") return false;
-      if (liveStatus(t) === "closed") return false;
-      return true;
-    });
+    // Historical benchmark seeds belong on the Comparables card of each
+    // tender detail page, not on the main dashboard.
+    let result = tenders.filter((t) => !(t.sources || []).includes("excel-comparables-seed"));
+
+    // Closed-tender handling. When the user explicitly picks "Closed", show
+    // ONLY the closed/awarded/past-deadline rows (Excel imports with stale
+    // 2025 deadlines land here). Otherwise hide them — they belong in
+    // /archives by default.
+    if (status === "Closed") {
+      result = result.filter((t) => {
+        if (t.tenderStatus === "closed" || t.tenderStatus === "awarded" || t.tenderStatus === "cancelled") return true;
+        return liveStatus(t) === "closed";
+      });
+    } else {
+      result = result.filter((t) => {
+        if (t.tenderStatus === "closed" || t.tenderStatus === "awarded" || t.tenderStatus === "cancelled") return false;
+        if (liveStatus(t) === "closed") return false;
+        return true;
+      });
+    }
     if (search) {
       const q = search.toLowerCase();
       result = result.filter((t) =>
