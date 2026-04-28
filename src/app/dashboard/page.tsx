@@ -174,7 +174,16 @@ function DashboardContent() {
     if (status === "Active") result = result.filter((t) => liveStatus(t) === "active");
     else if (status === "Closing Soon") result = result.filter((t) => liveStatus(t) === "closing_soon");
 
+    // Excel-only imports are spreadsheet snapshots — they're missing
+    // deadlines, summaries, document links, etc. Always push them below
+    // live-scraped tenders so the demo screen leads with the rich rows.
+    const isExcelOnly = (t: Tender) =>
+      Array.isArray(t.sources) && t.sources.length === 1 && t.sources[0] === "Excel Import";
+
     result.sort((a, b) => {
+      const aExcel = isExcelOnly(a);
+      const bExcel = isExcelOnly(b);
+      if (aExcel !== bExcel) return aExcel ? 1 : -1;
       switch (sortBy) {
         case "Days Left (asc)": return (a.daysLeft ?? 9999) - (b.daysLeft ?? 9999);
         case "Bid Deadline (asc)": {
