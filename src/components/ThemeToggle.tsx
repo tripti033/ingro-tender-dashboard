@@ -3,10 +3,10 @@
 import { useEffect, useState } from "react";
 
 export default function ThemeToggle({ collapsed }: { collapsed?: boolean }) {
-  const [theme, setTheme] = useState<"light" | "dark">("dark");
+  const [theme, setTheme] = useState<"light" | "dark">("light");
 
   useEffect(() => {
-    const stored = (localStorage.getItem("theme") as "light" | "dark" | null) || "dark";
+    const stored = (localStorage.getItem("theme") as "light" | "dark" | null) || "light";
     setTheme(stored);
     document.documentElement.classList.toggle("light", stored === "light");
   }, []);

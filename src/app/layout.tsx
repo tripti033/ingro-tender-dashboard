@@ -11,7 +11,7 @@ const themeInitScript = `
 (function() {
   try {
     var stored = localStorage.getItem('theme');
-    var theme = stored || 'dark';
+    var theme = stored || 'light';
     if (theme === 'light') document.documentElement.classList.add('light');
   } catch (e) {}
 })();
