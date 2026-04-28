@@ -143,6 +143,10 @@ export async function toggleRead(tenderId: string, uid: string, isRead: boolean)
   }
 }
 
+export async function deleteTender(tenderId: string): Promise<void> {
+  await deleteDoc(doc(db, "tenders", tenderId));
+}
+
 export async function createTender(data: Partial<Tender>): Promise<string> {
   // Sanitise NIT for doc ID
   const nitNumber = (data.nitNumber || `MANUAL-${Date.now()}`)

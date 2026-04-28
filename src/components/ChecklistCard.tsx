@@ -48,7 +48,7 @@ export default function ChecklistCard({
   const [items, setItems] = useState<ChecklistItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [mode, setMode] = useState<"idle" | "template" | "copy">("idle");
+  const [mode, setMode] = useState<"idle" | "template" | "copy" | "blank">("idle");
   const [showAdd, setShowAdd] = useState(false);
   const [newItem, setNewItem] = useState({ bucket: "Custom" as ChecklistBucket, document: "", reference: "" });
   const [saving, setSaving] = useState(false);
@@ -176,6 +176,7 @@ export default function ChecklistCard({
       setItems(fresh);
       setNewItem({ bucket: "Custom", document: "", reference: "" });
       setShowAdd(false);
+      if (mode === "blank") setMode("idle");
       void id;
     } finally { setSaving(false); }
   };
@@ -229,7 +230,7 @@ export default function ChecklistCard({
                   <div className="text-xs text-gray-500 mt-0.5">UJVNL Dhakrani, generic BESS, etc.</div>
                 </button>
                 <button
-                  onClick={() => { setShowAdd(true); }}
+                  onClick={() => { setMode("blank"); setShowAdd(true); }}
                   className="text-left border rounded-lg p-3 hover:bg-[var(--bg-subtle)] hover:border-[#0D1F3C] transition-colors"
                 >
                   <div className="text-sm font-medium text-gray-100">Start blank</div>
@@ -285,6 +286,48 @@ export default function ChecklistCard({
                 ))
               )}
               <button onClick={() => setMode("idle")} className="text-xs text-gray-400 hover:text-gray-600 mt-2">&larr; Back</button>
+            </div>
+          )}
+
+          {mode === "blank" && (
+            <div className="max-w-2xl mx-auto">
+              <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 text-center">
+                Add the first item
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  value={newItem.bucket}
+                  onChange={(e) => setNewItem({ ...newItem, bucket: e.target.value as ChecklistBucket })}
+                  className="border rounded-lg px-2 py-1.5 text-xs"
+                >
+                  {BUCKETS.map((b) => <option key={b} value={b}>{b}</option>)}
+                </select>
+                <input
+                  type="text"
+                  placeholder="Document / item *"
+                  value={newItem.document}
+                  onChange={(e) => setNewItem({ ...newItem, document: e.target.value })}
+                  onKeyDown={(e) => { if (e.key === "Enter" && newItem.document.trim()) handleAdd(); }}
+                  autoFocus
+                  className="border rounded-lg px-2 py-1.5 text-xs flex-1 min-w-[180px] focus:outline-none focus:ring-2 focus:ring-[#0D1F3C]/20"
+                />
+                <input
+                  type="text"
+                  placeholder="Reference (Format/Annexure)"
+                  value={newItem.reference}
+                  onChange={(e) => setNewItem({ ...newItem, reference: e.target.value })}
+                  onKeyDown={(e) => { if (e.key === "Enter" && newItem.document.trim()) handleAdd(); }}
+                  className="border rounded-lg px-2 py-1.5 text-xs w-56 focus:outline-none focus:ring-2 focus:ring-[#0D1F3C]/20"
+                />
+                <button
+                  onClick={handleAdd}
+                  disabled={saving || !newItem.document.trim()}
+                  className="bg-green-600 text-white px-3 py-1.5 rounded-lg text-xs hover:bg-green-700 disabled:opacity-50"
+                >
+                  Add
+                </button>
+              </div>
+              <button onClick={() => { setMode("idle"); setShowAdd(false); setNewItem({ bucket: "Custom", document: "", reference: "" }); }} className="text-xs text-gray-400 hover:text-gray-600 mt-3">&larr; Back</button>
             </div>
           )}
         </div>
