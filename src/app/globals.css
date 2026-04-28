@@ -110,3 +110,30 @@ html.light .hover\:bg-gray-800:hover,
 html.light .hover\:bg-gray-700:hover {
   background-color: #f3f4f6 !important;
 }
+
+/* Urgency-tinted cards (Closing soon) — dark-on-dark in dark mode,
+   pastel-on-light in light mode. */
+html.light .bg-red-950\/40 {
+  background-color: #fef2f2 !important;
+}
+html.light .border-red-800 {
+  border-color: #fecaca !important;
+}
+html.light .bg-amber-950\/30 {
+  background-color: #fffbeb !important;
+}
+html.light .border-amber-900\/60 {
+  border-color: #fde68a !important;
+}
+
+/* hover:brightness-125 on white-ish cards looks washed out — swap to a
+   subtle hover background for those tinted cards. */
+html.light .hover\:brightness-125:hover {
+  filter: none !important;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08) inset;
+}
+
+/* Dark-mode 50%-opacity hover rows used across pages */
+html.light .hover\:bg-gray-900\/50:hover {
+  background-color: #f9fafb !important;
+}

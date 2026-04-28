@@ -195,11 +195,18 @@ function DashboardContent() {
     return result;
   }, [tenders, search, category, authority, status, sortBy]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  // Auto-drafts created by `scraper/llm-alerts.js` use `DRAFT-<ts>` as the
+  // doc ID. They're real records but not real tenders yet — keep them out
+  // of the main paginated table and surface them in a separate group below.
+  const isAlertDraft = (t: Tender) => t.nitNumber.startsWith("DRAFT-");
+  const mainTenders = useMemo(() => filtered.filter((t) => !isAlertDraft(t)), [filtered]);
+  const alertDrafts = useMemo(() => filtered.filter(isAlertDraft), [filtered]);
+
+  const totalPages = Math.max(1, Math.ceil(mainTenders.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
   const pageStart = (currentPage - 1) * PAGE_SIZE;
-  const pageEnd = Math.min(pageStart + PAGE_SIZE, filtered.length);
-  const pageRows = filtered.slice(pageStart, pageEnd);
+  const pageEnd = Math.min(pageStart + PAGE_SIZE, mainTenders.length);
+  const pageRows = mainTenders.slice(pageStart, pageEnd);
 
   const handleFlagChange = async (e: React.ChangeEvent<HTMLSelectElement>, tender: Tender) => {
     e.stopPropagation();
@@ -264,9 +271,10 @@ function DashboardContent() {
             </select>
           </div>
           <span className="text-sm text-gray-400 ml-auto">
-            {filtered.length === 0
+            {mainTenders.length === 0
               ? `0 of ${tenders.length}`
-              : `Showing ${pageStart + 1}\u2013${pageEnd} of ${filtered.length}${filtered.length !== tenders.length ? ` (filtered from ${tenders.length})` : ""}`}
+              : `Showing ${pageStart + 1}\u2013${pageEnd} of ${mainTenders.length}${mainTenders.length !== tenders.length ? ` (filtered from ${tenders.length})` : ""}`}
+            {alertDrafts.length > 0 && ` \u00b7 ${alertDrafts.length} draft${alertDrafts.length === 1 ? "" : "s"}`}
           </span>
           <button onClick={() => router.push("/tender/new")}
             className="bg-[#0D1F3C] text-white px-3 py-2 rounded-lg text-sm hover:bg-[#162d52] transition-colors">
@@ -291,9 +299,9 @@ function DashboardContent() {
               Retry
             </button>
           </div>
-        ) : filtered.length === 0 ? (
+        ) : mainTenders.length === 0 && alertDrafts.length === 0 ? (
           <div className="text-center py-16 text-gray-400">No tenders match your filters</div>
-        ) : (
+        ) : mainTenders.length === 0 ? null : (
           <div className="overflow-x-auto rounded-lg border">
             <table className="w-full text-sm">
               <thead className="bg-[var(--bg-subtle)] text-left text-gray-500 font-medium text-xs uppercase tracking-wider">
@@ -414,7 +422,7 @@ function DashboardContent() {
           </div>
         )}
 
-        {!loading && !error && totalPages > 1 && (
+        {!loading && !error && mainTenders.length > 0 && totalPages > 1 && (
           <div className="flex items-center justify-between mt-4 text-sm">
             <div className="text-gray-500">Page {currentPage} of {totalPages}</div>
             <div className="flex items-center gap-1">
@@ -446,6 +454,68 @@ function DashboardContent() {
               >
                 Last &raquo;
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* Alert auto-drafts: separated so they don't get mixed into the
+            real-tenders table. These were created by `scraper/llm-alerts.js`
+            from high-relevance news items the LLM flagged as tender
+            announcements — they need a human pass before being promoted. */}
+        {!loading && !error && alertDrafts.length > 0 && (
+          <div className="mt-8 bg-[var(--bg-card)] rounded-lg border p-5">
+            <div className="flex items-baseline justify-between mb-3">
+              <div>
+                <h2 className="text-base font-semibold text-gray-100">Drafts from alerts</h2>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Auto-flagged by the alerts scanner. Open one to fill in the missing fields and promote it to a real tender.
+                </p>
+              </div>
+              <span className="text-xs text-gray-400">{alertDrafts.length} pending review</span>
+            </div>
+            <div className="overflow-x-auto rounded border">
+              <table className="w-full text-sm">
+                <thead className="bg-[var(--bg-subtle)] text-left text-gray-500 text-xs uppercase tracking-wider">
+                  <tr>
+                    <th className="px-3 py-2">Title</th>
+                    <th className="px-3 py-2">Authority</th>
+                    <th className="px-3 py-2">State</th>
+                    <th className="px-3 py-2 text-right">MW</th>
+                    <th className="px-3 py-2 text-right">MWh</th>
+                    <th className="px-3 py-2">Source</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {alertDrafts.map((t) => (
+                    <tr
+                      key={t.nitNumber}
+                      onClick={() => router.push(`/tender/${encodeURIComponent(t.nitNumber)}`)}
+                      className="hover:bg-[var(--bg-subtle)] cursor-pointer transition-colors"
+                    >
+                      <td className="px-3 py-2.5 max-w-md">
+                        <div className="text-gray-100 truncate" title={t.title || ""}>{truncate(t.title, 90)}</div>
+                      </td>
+                      <td className="px-3 py-2.5 text-xs">{t.authority || "—"}</td>
+                      <td className="px-3 py-2.5 text-xs">{t.state || "—"}</td>
+                      <td className="px-3 py-2.5 text-right text-xs">{t.powerMW != null ? t.powerMW.toLocaleString() : "—"}</td>
+                      <td className="px-3 py-2.5 text-right text-xs">{t.energyMWh != null ? t.energyMWh.toLocaleString() : "—"}</td>
+                      <td className="px-3 py-2.5 text-xs">
+                        {t.sourceUrl ? (
+                          <a
+                            href={t.sourceUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-[#0D1F3C] hover:underline"
+                          >
+                            View article
+                          </a>
+                        ) : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         )}

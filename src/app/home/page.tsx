@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import { type User } from "firebase/auth";
 import { onAuthChange } from "@/lib/auth";
 import {
-  getTenders, getBids, getAlerts, getEmployees,
-  type Tender, type Bid, type Alert, type Employee,
+  getTenders, getAlerts, getEmployees,
+  type Tender, type Alert, type Employee,
 } from "@/lib/firestore";
 import AuthGuard from "@/components/AuthGuard";
 import Sidebar from "@/components/Sidebar";
@@ -33,7 +33,6 @@ function HomeContent() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [tenders, setTenders] = useState<Tender[]>([]);
-  const [bids, setBids] = useState<Bid[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,11 +42,10 @@ function HomeContent() {
   useEffect(() => {
     Promise.all([
       getTenders(),
-      getBids(),
       getAlerts(20),
       getEmployees(),
-    ]).then(([t, b, a, e]) => {
-      setTenders(t); setBids(b); setAlerts(a); setEmployees(e);
+    ]).then(([t, a, e]) => {
+      setTenders(t); setAlerts(a); setEmployees(e);
     }).finally(() => setLoading(false));
   }, []);
 
@@ -87,19 +85,6 @@ function HomeContent() {
       return d != null && d >= 0 && d <= 7;
     }).length;
   }, [inPrepTenders]);
-
-  // Win rate (90d): from bids collection — won / total in last 90 days
-  const winRate90d = useMemo(() => {
-    const ninetyAgo = Date.now() - 90 * 86400000;
-    void ninetyAgo;
-    // Bids don't carry a date directly; use all bids as a proxy. Not perfect
-    // but matches the demo screenshot — refine later when bid records carry
-    // an "awardedAt" timestamp.
-    const submitted = bids.length;
-    const won = bids.filter((b) => b.result === "won").length;
-    if (submitted === 0) return { pct: 0, won: 0, total: 0 };
-    return { pct: Math.round((won / submitted) * 100), won, total: submitted };
-  }, [bids]);
 
   // Total EMD due this week (count of tenders with EMD pending in next 7 days)
   const emdsDueThisWeek = useMemo(() => {
@@ -191,11 +176,11 @@ function HomeContent() {
 
         {/* KPI cards */}
         {loading ? (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-            {[...Array(4)].map((_, i) => <div key={i} className="h-28 bg-gray-800/50 rounded-xl animate-pulse" />)}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
+            {[...Array(3)].map((_, i) => <div key={i} className="h-28 bg-gray-800/50 rounded-xl animate-pulse" />)}
           </div>
         ) : (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
             <Kpi
               label="Active tenders"
               value={String(activeTenders.length)}
@@ -214,12 +199,6 @@ function HomeContent() {
               value={String(inPrepTenders.length)}
               hint={dueThisWeek > 0 ? `${dueThisWeek} due this week` : "none due this week"}
               hintColor={dueThisWeek > 0 ? "text-amber-400" : "text-gray-500"}
-            />
-            <Kpi
-              label="Win rate (90d)"
-              value={`${winRate90d.pct}%`}
-              hint={`${winRate90d.won} of ${winRate90d.total} submitted`}
-              hintColor="text-gray-500"
             />
           </div>
         )}
