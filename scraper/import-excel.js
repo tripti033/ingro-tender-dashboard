@@ -7,7 +7,7 @@
 import "dotenv/config";
 import XLSX from "xlsx";
 import { initializeApp } from "firebase/app";
-import { getFirestore, doc, setDoc, Timestamp } from "firebase/firestore";
+import { getFirestore, doc, getDoc, setDoc, Timestamp } from "firebase/firestore";
 import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
 
 const XLSX_PATH = "./BESS Tenders and Enquiries (1).xlsx";
@@ -114,6 +114,8 @@ function getStr(rowIndex, colIndex) {
 
 const now = Timestamp.now();
 let written = 0;
+let skipped = 0;
+let errored = 0;
 
 for (let col = 1; col <= tenderCount; col++) {
   const rawNit = getStr(1, col);
@@ -121,6 +123,17 @@ for (let col = 1; col <= tenderCount; col++) {
 
   const nitNumber = sanitiseNit(rawNit);
   if (!nitNumber) continue;
+
+  // Skip if a tender with this NIT is already in Firestore — could have
+  // been picked up by the live scraper or hand-edited; we don't want to
+  // clobber either with the spreadsheet snapshot.
+  const ref = doc(db, "tenders", nitNumber);
+  const existing = await getDoc(ref);
+  if (existing.exists()) {
+    skipped++;
+    console.log(`[skip] ${nitNumber} already in Firestore`);
+    continue;
+  }
 
   const authority = getStr(3, col);
   const powerMW = parseNum(getCell(6, col));
@@ -219,13 +232,14 @@ for (let col = 1; col <= tenderCount; col++) {
   };
 
   try {
-    await setDoc(doc(db, "tenders", nitNumber), tender);
+    await setDoc(ref, tender);
     written++;
     console.log(`[${written}] ${nitNumber} — ${title.slice(0, 60)}`);
   } catch (err) {
+    errored++;
     console.error(`Failed: ${nitNumber} — ${err.message}`);
   }
 }
 
-console.log(`\nDone. Imported ${written} tenders.`);
+console.log(`\nDone. New: ${written}, Skipped (already exists): ${skipped}, Errored: ${errored}`);
 process.exit(0);
