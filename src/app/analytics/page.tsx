@@ -16,6 +16,12 @@ type VGFBand = "No-VGF" | "VGF1" | "VGF2";
 const DURATIONS: DurationBucket[] = ["2hr", "3hr", "4hr+"];
 const BANDS: VGFBand[] = ["No-VGF", "VGF1", "VGF2"];
 
+const BAND_COLOR: Record<VGFBand, string> = {
+  "VGF2": "#10b981",
+  "VGF1": "#f59e0b",
+  "No-VGF": "#94a3b8",
+};
+
 function fmtCr(rs: number | null | undefined): string {
   if (rs == null || isNaN(rs) || rs === 0) return "—";
   if (rs >= 10000000) return `₹${(rs / 10000000).toFixed(1)} Cr`;
@@ -88,7 +94,7 @@ function AnalyticsContent() {
   const router = useRouter();
   const [tenders, setTenders] = useState<Tender[]>([]);
   const [bids, setBids] = useState<Bid[]>([]);
-  const [companies, setCompanies] = useState<Company[]>([]);
+  const [, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState<TimeRange>("all");
   const [selectedCell, setSelectedCell] = useState<{ dur: DurationBucket; band: VGFBand } | null>(null);
@@ -99,8 +105,6 @@ function AnalyticsContent() {
       .finally(() => setLoading(false));
   }, []);
 
-  // Awarded tenders = the corpus we mine for market intelligence.
-  // Includes BENCH-* historical seeds + any tender result-tracker has stamped.
   const awarded = useMemo(() => {
     return tenders.filter((t) => {
       if (!t.tariffRsPerMwPerMonth) return false;
@@ -111,7 +115,7 @@ function AnalyticsContent() {
 
   const activeAll = useMemo(() => tenders.filter(isActive), [tenders]);
 
-  // ── Pricing grid: median tariff per (duration × VGF band) ──
+  // ── Pricing grid ──
   const grid = useMemo(() => {
     const cells: Record<string, { tariffs: number[]; tenders: Tender[] }> = {};
     for (const d of DURATIONS) for (const b of BANDS) cells[`${d}|${b}`] = { tariffs: [], tenders: [] };
@@ -127,18 +131,13 @@ function AnalyticsContent() {
     return cells;
   }, [awarded]);
 
-  const overallTariffRange = useMemo(() => {
-    const all = awarded.map((t) => t.tariffRsPerMwPerMonth!).filter(Boolean);
-    return { min: Math.min(...all, Infinity), max: Math.max(...all, -Infinity) };
-  }, [awarded]);
-
   const selectedCellTenders = useMemo(() => {
     if (!selectedCell) return [];
     const key = `${selectedCell.dur}|${selectedCell.band}`;
     return (grid[key]?.tenders || []).slice().sort((a, b) => (a.tariffRsPerMwPerMonth || 0) - (b.tariffRsPerMwPerMonth || 0));
   }, [grid, selectedCell]);
 
-  // ── Tariff trend over time ──
+  // ── Tariff trend ──
   const tariffTrend = useMemo(() => {
     const buckets = new Map<string, { VGF1: number[]; VGF2: number[]; "No-VGF": number[]; quarter: string; ts: number }>();
     for (const t of awarded) {
@@ -161,8 +160,36 @@ function AnalyticsContent() {
       }));
   }, [awarded]);
 
-  // ── Top competitors: companies that have actually won, with their avg tariff and footprint ──
-  const competitors = useMemo(() => {
+  // ── Scatter: capacity vs tariff ──
+  const scatterPoints = useMemo(() => {
+    return awarded
+      .filter((t) => t.energyMWh && t.tariffRsPerMwPerMonth && t.tariffBand)
+      .map((t) => ({
+        mwh: t.energyMWh!,
+        tariff: t.tariffRsPerMwPerMonth!,
+        band: t.tariffBand as VGFBand,
+        label: `${t.authority || "?"} ${t.powerMW}MW/${t.energyMWh}MWh`,
+        nit: t.nitNumber,
+      }));
+  }, [awarded]);
+
+  // ── Quarterly MW awarded (stacked bar) ──
+  const quarterlyMW = useMemo(() => {
+    const buckets = new Map<string, { "VGF2": number; "VGF1": number; "No-VGF": number; quarter: string; ts: number }>();
+    for (const t of awarded) {
+      const ad = tsDate(t.awardDate) || tsDate(t.firstSeenAt);
+      if (!ad || !t.powerMW) continue;
+      const q = quarterKey(ad);
+      if (!buckets.has(q)) buckets.set(q, { VGF2: 0, VGF1: 0, "No-VGF": 0, quarter: q, ts: ad.getTime() });
+      const b = buckets.get(q)!;
+      const band = t.tariffBand;
+      if (band === "VGF1" || band === "VGF2" || band === "No-VGF") b[band] += t.powerMW;
+    }
+    return Array.from(buckets.values()).sort((a, b) => a.ts - b.ts);
+  }, [awarded]);
+
+  // ── Top winners (horizontal bars) ──
+  const topWinners = useMemo(() => {
     const wins = new Map<string, { name: string; wins: number; totalMWh: number; tariffs: number[]; states: Set<string> }>();
     for (const b of bids) {
       if (b.result !== "won") continue;
@@ -182,15 +209,13 @@ function AnalyticsContent() {
         totalMWh: c.totalMWh,
         avgTariff: c.tariffs.length > 0 ? c.tariffs.reduce((s, x) => s + x, 0) / c.tariffs.length : null,
         stateCount: c.states.size,
-        states: Array.from(c.states).slice(0, 3).join(", "),
       }))
       .sort((a, b) => b.totalMWh - a.totalMWh || b.wins - a.wins)
       .slice(0, 10);
   }, [bids]);
 
-  // ── Bidder competition: avg # bidders by tender size band ──
+  // ── Competition density ──
   const competition = useMemo(() => {
-    // For each closed tender, count how many bid records exist
     const byTender = new Map<string, number>();
     for (const b of bids) {
       if (!b.tenderNit) continue;
@@ -218,47 +243,29 @@ function AnalyticsContent() {
     }));
   }, [tenders, bids]);
 
-  // ── Authority performance ──
-  const authorityPerf = useMemo(() => {
-    const map = new Map<string, { count: number; mw: number; mwh: number; awarded: number; active: number }>();
-    for (const t of tenders) {
-      if ((t.sources || []).includes("excel-comparables-seed")) continue;
-      const auth = t.authority;
-      if (!auth) continue;
-      const fs = tsDate(t.firstSeenAt);
-      if (!withinRange(fs, range)) continue;
-      if (!map.has(auth)) map.set(auth, { count: 0, mw: 0, mwh: 0, awarded: 0, active: 0 });
-      const s = map.get(auth)!;
-      s.count++;
-      s.mw += t.powerMW || 0;
-      s.mwh += t.energyMWh || 0;
-      if (t.awardedTo) s.awarded++;
-      if (isActive(t)) s.active++;
+  // ── VGF band distribution donut ──
+  const bandMix = useMemo(() => {
+    const counts: Record<VGFBand, number> = { "VGF2": 0, "VGF1": 0, "No-VGF": 0 };
+    let totalMW = 0;
+    const mwCounts: Record<VGFBand, number> = { "VGF2": 0, "VGF1": 0, "No-VGF": 0 };
+    for (const t of awarded) {
+      const band = t.tariffBand;
+      if (band === "VGF1" || band === "VGF2" || band === "No-VGF") {
+        counts[band]++;
+        if (t.powerMW) {
+          mwCounts[band] += t.powerMW;
+          totalMW += t.powerMW;
+        }
+      }
     }
-    return Array.from(map.entries())
-      .map(([auth, s]) => ({ authority: auth, ...s }))
-      .sort((a, b) => b.mwh - a.mwh)
-      .slice(0, 10);
-  }, [tenders, range]);
+    return BANDS.map((b) => ({
+      band: b,
+      count: counts[b],
+      mw: mwCounts[b],
+      pctMW: totalMW > 0 ? (mwCounts[b] / totalMW) * 100 : 0,
+    }));
+  }, [awarded]);
 
-  // ── Active pipeline action items ──
-  const actions = useMemo(() => {
-    const closingThisWeek = activeAll.filter((t) => {
-      const d = liveDaysLeft(t);
-      return d != null && d >= 0 && d <= 7;
-    });
-    const noChecklist = closingThisWeek.filter((t) => !t.assignedTo);
-    const stuck = activeAll.filter((t) => t.assignedTo && !Object.values(t.flags || {}).some((f) => f === "Applying"));
-    const orphan = activeAll.filter((t) => !t.assignedTo && !Object.values(t.flags || {}).some((f) => !!f && f !== "—"));
-    return {
-      closingThisWeek: closingThisWeek.length,
-      hot: noChecklist.slice(0, 5),
-      stuck: stuck.slice(0, 5),
-      orphan: orphan.slice(0, 5),
-    };
-  }, [activeAll]);
-
-  // ── KPIs ──
   const kpis = useMemo(() => {
     const pipelineMW = activeAll.reduce((s, t) => s + (t.powerMW || 0), 0);
     const pipelineMWh = activeAll.reduce((s, t) => s + (t.energyMWh || 0), 0);
@@ -266,10 +273,12 @@ function AnalyticsContent() {
     const cashLocked = activeAll
       .filter((t) => Object.values(t.flags || {}).some((f) => f === "Applying"))
       .reduce((s, t) => s + (t.emdAmount || 0), 0);
-    const benchmarkMedian = grid["2hr|VGF2"]?.tariffs.length
-      ? median(grid["2hr|VGF2"].tariffs)
-      : null;
-    return { pipelineMW, pipelineMWh, pipelineValue, cashLocked, benchmarkMedian };
+    const benchmarkMedian = median(grid["2hr|VGF2"]?.tariffs || []);
+    const closingThisWeek = activeAll.filter((t) => {
+      const d = liveDaysLeft(t);
+      return d != null && d >= 0 && d <= 7;
+    }).length;
+    return { pipelineMW, pipelineMWh, pipelineValue, cashLocked, benchmarkMedian, closingThisWeek };
   }, [activeAll, grid]);
 
   return (
@@ -310,7 +319,7 @@ function AnalyticsContent() {
           </div>
         ) : (
           <>
-            {/* KPI strip — strategic, not just counts */}
+            {/* KPI strip */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <Kpi
                 label="Active pipeline"
@@ -328,13 +337,13 @@ function AnalyticsContent() {
               <Kpi
                 label="Benchmark — 2hr VGF2"
                 value={kpis.benchmarkMedian ? fmtTariff(kpis.benchmarkMedian) : "—"}
-                hint={`Current floor for standard 2hr standalone bids`}
+                hint="Current floor for standard 2hr standalone bids"
                 accent="text-violet-500"
               />
               <Kpi
                 label="EMD locked"
                 value={fmtCr(kpis.cashLocked)}
-                hint={`${actions.closingThisWeek} bid${actions.closingThisWeek === 1 ? "" : "s"} due this week`}
+                hint={`${kpis.closingThisWeek} bid${kpis.closingThisWeek === 1 ? "" : "s"} due this week`}
                 accent={kpis.cashLocked > 0 ? "text-amber-500" : "text-gray-400"}
               />
             </div>
@@ -342,7 +351,7 @@ function AnalyticsContent() {
             {/* HERO: Pricing grid */}
             <Panel
               title="Pricing intelligence"
-              subtitle="What past awards tell us. Median ₹/MW/Month for each duration × VGF band combo. Click a cell to see the underlying tenders."
+              subtitle="Median ₹/MW/Month for each duration × VGF band combo. Click a cell to see the underlying tenders."
             >
               <PricingGrid grid={grid} onCellClick={setSelectedCell} selected={selectedCell} />
               {selectedCell && (
@@ -374,16 +383,13 @@ function AnalyticsContent() {
                   </div>
                 </div>
               )}
-              <p className="text-[11px] text-gray-400 mt-3">
-                Reading the grid: greener = cheaper benchmark, redder = pricier. Empty cells need more award data — fill in via the &quot;Awarded To&quot; + tariff fields on the tender detail page.
-              </p>
             </Panel>
 
-            {/* Row: Tariff trajectory + Active action items */}
+            {/* Row 1: Tariff trajectory + Capacity-vs-Tariff scatter */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <Panel
                 title="Tariff trajectory"
-                subtitle="Quarterly median, by VGF band. The line shows whether prices are still falling."
+                subtitle="Quarterly median ₹/MW/Month, split by VGF band. Direction matters more than absolute value."
               >
                 {tariffTrend.length === 0 ? (
                   <Empty hint="Need awarded tenders with tariff + award date." />
@@ -398,7 +404,7 @@ function AnalyticsContent() {
                   const pct = ((last - first) / first) * 100;
                   return (
                     <div className="mt-3 text-xs">
-                      <span className="text-gray-500">VGF2 trend over the last {recent.length} quarter{recent.length === 1 ? "" : "s"}: </span>
+                      <span className="text-gray-500">VGF2 over last {recent.length} quarter{recent.length === 1 ? "" : "s"}: </span>
                       <span className={pct < 0 ? "text-emerald-600 font-semibold" : "text-red-600 font-semibold"}>
                         {pct >= 0 ? "+" : ""}{pct.toFixed(1)}%
                       </span>
@@ -408,140 +414,69 @@ function AnalyticsContent() {
               </Panel>
 
               <Panel
-                title="Action items"
-                subtitle="What the team should look at first thing tomorrow."
+                title="Capacity vs Tariff"
+                subtitle="Each dot is one award. X = MWh, Y = ₹/MW/Month. Color by VGF band. Bigger projects usually price lower."
               >
-                <ActionItems
-                  closingThisWeek={actions.closingThisWeek}
-                  hot={actions.hot}
-                  stuck={actions.stuck}
-                  orphan={actions.orphan}
-                  onTender={(nit) => router.push(`/tender/${encodeURIComponent(nit)}?from=/analytics`)}
-                />
+                {scatterPoints.length === 0 ? (
+                  <Empty hint="Need awarded tenders with capacity + tariff." />
+                ) : (
+                  <ScatterChart points={scatterPoints} onClick={(nit) => router.push(`/tender/${encodeURIComponent(nit)}?from=/analytics`)} />
+                )}
               </Panel>
             </div>
 
-            {/* Row: Competitors + Competition density */}
+            {/* Row 2: Quarterly MW stacked bar + VGF band donut */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <Panel
+                title="MW awarded per quarter"
+                subtitle="Stacked by VGF band. Shows market growth + how each tranche took over."
+              >
+                {quarterlyMW.length === 0 ? (
+                  <Empty hint="Need awarded tenders with MW + award date." />
+                ) : (
+                  <StackedBarChart data={quarterlyMW} />
+                )}
+              </Panel>
+
+              <Panel
+                title="VGF band split"
+                subtitle="Share of awarded MW by VGF tranche. Tells the story of the market over time in one ring."
+              >
+                {bandMix.every((b) => b.mw === 0) ? (
+                  <Empty />
+                ) : (
+                  <DonutChart data={bandMix} />
+                )}
+              </Panel>
+            </div>
+
+            {/* Row 3: Top winners horizontal bars + Competition density */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <Panel
                 title="Top winners"
-                subtitle={`${competitors.length} companies who've actually won BESS capacity. Sorted by total MWh.`}
+                subtitle="Companies ranked by total MWh won across tracked tenders."
               >
-                {competitors.length === 0 ? <Empty /> : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs">
-                      <thead className="text-left text-gray-500 uppercase tracking-wider">
-                        <tr>
-                          <th className="py-2 pr-3">Company</th>
-                          <th className="py-2 pr-3 text-right">Wins</th>
-                          <th className="py-2 pr-3 text-right">Total MWh</th>
-                          <th className="py-2 pr-3 text-right">Avg ₹L/MW</th>
-                          <th className="py-2 pr-3">States</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[var(--border-subtle)]">
-                        {competitors.map((c, i) => (
-                          <tr key={i} className="hover:bg-[var(--bg-subtle)]">
-                            <td className="py-2 pr-3 text-gray-100 font-medium">{c.name}</td>
-                            <td className="py-2 pr-3 text-right text-emerald-600 font-semibold">{c.wins}</td>
-                            <td className="py-2 pr-3 text-right">{fmtMWh(c.totalMWh)}</td>
-                            <td className="py-2 pr-3 text-right">{c.avgTariff ? c.avgTariff.toFixed(2) : "—"}</td>
-                            <td className="py-2 pr-3 text-gray-500 max-w-[140px] truncate" title={c.states}>
-                              {c.stateCount > 0 ? `${c.stateCount}: ${c.states}${c.stateCount > 3 ? "…" : ""}` : "—"}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                {topWinners.length === 0 ? <Empty /> : (
+                  <HorizontalBars
+                    data={topWinners.map((c) => ({
+                      label: c.name,
+                      value: c.totalMWh,
+                      meta: `${c.wins} win${c.wins === 1 ? "" : "s"}${c.avgTariff ? ` · avg ₹${c.avgTariff.toFixed(2)}L/MW` : ""}${c.stateCount > 0 ? ` · ${c.stateCount} state${c.stateCount === 1 ? "" : "s"}` : ""}`,
+                      formatted: fmtMWh(c.totalMWh),
+                    }))}
+                  />
                 )}
               </Panel>
 
               <Panel
                 title="Competition density"
-                subtitle="How many bidders typically show up at each tender size? Smaller tenders = lighter competition."
+                subtitle="Avg # of bidders by tender size. Smaller sizes = lighter competition."
               >
-                {competition.every((c) => c.tenderCount === 0) ? <Empty hint="Need awarded tenders with bid records." /> : (
-                  <div className="space-y-3">
-                    {competition.map((c) => {
-                      const maxBidders = 25;
-                      const pct = Math.min(100, (c.avg / maxBidders) * 100);
-                      return (
-                        <div key={c.range} className="text-xs">
-                          <div className="flex items-baseline justify-between mb-1">
-                            <span className="font-medium text-gray-100">{c.range}</span>
-                            <span className="text-gray-500">
-                              <span className="font-semibold text-gray-100">{c.avg.toFixed(1)}</span> avg bidders
-                              {c.tenderCount > 0 && <span> · across {c.tenderCount} tender{c.tenderCount === 1 ? "" : "s"}</span>}
-                              {c.max > 0 && <span> · max {c.max}</span>}
-                            </span>
-                          </div>
-                          <div className="bg-[var(--bg-subtle)] rounded h-3 relative overflow-hidden">
-                            <div
-                              className={`h-full ${
-                                c.avg < 5 ? "bg-emerald-500"
-                                : c.avg < 10 ? "bg-amber-500"
-                                : "bg-red-500"
-                              }`}
-                              style={{ width: `${pct}%` }}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
-                    <p className="text-[11px] text-gray-400 mt-2">
-                      Green = light competition (under 5 bidders typical), amber = moderate, red = crowded. Use this to pick where to focus.
-                    </p>
-                  </div>
+                {competition.every((c) => c.tenderCount === 0) ? <Empty /> : (
+                  <CompetitionBars data={competition} />
                 )}
               </Panel>
             </div>
-
-            {/* Authority performance */}
-            <Panel
-              title="Authority focus"
-              subtitle="Which DISCOMs run the most BESS capacity. Use this to plan your relationship priorities."
-            >
-              {authorityPerf.length === 0 ? <Empty /> : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead className="text-left text-gray-500 uppercase tracking-wider">
-                      <tr>
-                        <th className="py-2 pr-3">Authority</th>
-                        <th className="py-2 pr-3 text-right">Tenders</th>
-                        <th className="py-2 pr-3 text-right">Total MW</th>
-                        <th className="py-2 pr-3 text-right">Total MWh</th>
-                        <th className="py-2 pr-3 text-right">Awarded</th>
-                        <th className="py-2 pr-3 text-right">Active now</th>
-                        <th className="py-2 pr-3"></th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[var(--border-subtle)]">
-                      {authorityPerf.map((a) => (
-                        <tr key={a.authority} className="hover:bg-[var(--bg-subtle)]">
-                          <td className="py-2 pr-3 text-gray-100 font-medium">{a.authority}</td>
-                          <td className="py-2 pr-3 text-right">{a.count}</td>
-                          <td className="py-2 pr-3 text-right">{fmtMW(a.mw)}</td>
-                          <td className="py-2 pr-3 text-right font-semibold">{fmtMWh(a.mwh)}</td>
-                          <td className="py-2 pr-3 text-right text-emerald-600">{a.awarded > 0 ? a.awarded : "—"}</td>
-                          <td className="py-2 pr-3 text-right text-blue-600 font-semibold">{a.active > 0 ? a.active : "—"}</td>
-                          <td className="py-2 pr-3 text-right">
-                            {a.active > 0 && (
-                              <button
-                                onClick={() => router.push(`/dashboard?authority=${encodeURIComponent(a.authority)}`)}
-                                className="text-[#0D1F3C] hover:underline text-xs"
-                              >
-                                Filter →
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </Panel>
           </>
         )}
       </div>
@@ -590,7 +525,6 @@ function PricingGrid({
   onCellClick: (cell: { dur: DurationBucket; band: VGFBand } | null) => void;
   selected: { dur: DurationBucket; band: VGFBand } | null;
 }) {
-  // Compute global min/max for color scale
   const allMedians: number[] = [];
   for (const dur of DURATIONS) for (const band of BANDS) {
     const m = median(grid[`${dur}|${band}`]?.tariffs || []);
@@ -602,15 +536,12 @@ function PricingGrid({
   const cellBg = (m: number | null) => {
     if (m == null) return "bg-[var(--bg-subtle)]";
     if (allMedians.length < 2 || maxTariff === minTariff) return "bg-emerald-100";
-    const t = (m - minTariff) / (maxTariff - minTariff); // 0 = cheapest = green, 1 = priciest = red
+    const t = (m - minTariff) / (maxTariff - minTariff);
     if (t < 0.33) return "bg-emerald-100";
     if (t < 0.66) return "bg-amber-100";
     return "bg-red-100";
   };
-  const cellText = (m: number | null) => {
-    if (m == null) return "text-gray-400";
-    return "text-gray-900";
-  };
+  const cellText = (m: number | null) => m == null ? "text-gray-400" : "text-gray-900";
 
   return (
     <div className="overflow-x-auto">
@@ -619,9 +550,7 @@ function PricingGrid({
           <tr>
             <th className="text-left text-[10px] uppercase tracking-wider text-gray-500 pb-2 font-semibold w-20">Duration</th>
             {BANDS.map((band) => (
-              <th key={band} className="text-center text-[10px] uppercase tracking-wider text-gray-500 pb-2 font-semibold">
-                {band}
-              </th>
+              <th key={band} className="text-center text-[10px] uppercase tracking-wider text-gray-500 pb-2 font-semibold">{band}</th>
             ))}
           </tr>
         </thead>
@@ -661,58 +590,6 @@ function PricingGrid({
   );
 }
 
-function ActionItems({
-  closingThisWeek, hot, stuck, orphan, onTender,
-}: {
-  closingThisWeek: number;
-  hot: Tender[];
-  stuck: Tender[];
-  orphan: Tender[];
-  onTender: (nit: string) => void;
-}) {
-  const sections = [
-    { label: "Closing in 7d, no assignee", color: "text-red-600", items: hot },
-    { label: "Assigned but not Applying", color: "text-amber-600", items: stuck },
-    { label: "Unflagged + unassigned", color: "text-gray-500", items: orphan },
-  ];
-  return (
-    <div className="space-y-4">
-      {sections.map((s) => (
-        <div key={s.label}>
-          <div className="flex items-baseline justify-between mb-1.5">
-            <h3 className={`text-xs font-semibold ${s.color}`}>{s.label}</h3>
-            <span className="text-[11px] text-gray-400">{s.items.length}</span>
-          </div>
-          {s.items.length === 0 ? (
-            <div className="text-[11px] text-gray-400 py-1.5">All clear</div>
-          ) : (
-            <div className="space-y-1">
-              {s.items.map((t) => (
-                <button
-                  key={t.nitNumber}
-                  onClick={() => onTender(t.nitNumber)}
-                  className="w-full text-left flex items-center justify-between p-1.5 rounded hover:bg-[var(--bg-subtle)] transition-colors text-xs"
-                >
-                  <span className="text-gray-100 truncate">
-                    {t.authority || "?"} {t.powerMW || "?"}MW{t.energyMWh ? `/${t.energyMWh}MWh` : ""}
-                    <span className="text-gray-500 ml-1.5 truncate">— {(t.title || t.nitNumber).slice(0, 50)}</span>
-                  </span>
-                  <span className="text-gray-400 shrink-0 ml-2">
-                    {liveDaysLeft(t) != null ? `${liveDaysLeft(t)}d` : "—"}
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      ))}
-      {closingThisWeek === 0 && hot.length === 0 && stuck.length === 0 && orphan.length === 0 && (
-        <Empty hint="Pipeline is clean. Nothing demands action right now." />
-      )}
-    </div>
-  );
-}
-
 function TariffChart({ data }: { data: Array<{ quarter: string; VGF1: number | null; VGF2: number | null; "No-VGF": number | null; count: number }> }) {
   const W = 560;
   const H = 200;
@@ -734,13 +611,9 @@ function TariffChart({ data }: { data: Array<{ quarter: string; VGF1: number | n
   const x = (i: number) => PAD_L + (data.length === 1 ? innerW / 2 : (i / (data.length - 1)) * innerW);
   const y = (v: number) => PAD_T + innerH - ((v - y0) / (y1 - y0)) * innerH;
 
-  const series: Array<{ key: "VGF1" | "VGF2" | "No-VGF"; color: string; label: string }> = [
-    { key: "VGF2", color: "#10b981", label: "VGF2" },
-    { key: "VGF1", color: "#f59e0b", label: "VGF1" },
-    { key: "No-VGF", color: "#94a3b8", label: "No-VGF" },
-  ];
+  const series = BANDS.slice().reverse().map((band) => ({ key: band, color: BAND_COLOR[band], label: band }));
 
-  const linePath = (key: "VGF1" | "VGF2" | "No-VGF"): string => {
+  const linePath = (key: VGFBand): string => {
     const pts: string[] = [];
     let started = false;
     data.forEach((d, i) => {
@@ -769,19 +642,13 @@ function TariffChart({ data }: { data: Array<{ quarter: string; VGF1: number | n
         {tickVals.map((v, i) => (
           <g key={i}>
             <line x1={PAD_L} x2={W - PAD_R} y1={y(v)} y2={y(v)} stroke="currentColor" strokeOpacity={0.08} strokeDasharray="3,3" />
-            <text x={PAD_L - 4} y={y(v) + 3} textAnchor="end" fontSize={9} fill="currentColor" fillOpacity={0.5}>
-              ₹{(v / 100000).toFixed(1)}L
-            </text>
+            <text x={PAD_L - 4} y={y(v) + 3} textAnchor="end" fontSize={9} fill="currentColor" fillOpacity={0.5}>₹{(v / 100000).toFixed(1)}L</text>
           </g>
         ))}
         {data.map((d, i) => (
-          <text key={d.quarter} x={x(i)} y={H - 14} textAnchor="middle" fontSize={9} fill="currentColor" fillOpacity={0.6}>
-            {d.quarter}
-          </text>
+          <text key={d.quarter} x={x(i)} y={H - 14} textAnchor="middle" fontSize={9} fill="currentColor" fillOpacity={0.6}>{d.quarter}</text>
         ))}
-        {series.map((s) => (
-          <path key={s.key} d={linePath(s.key)} fill="none" stroke={s.color} strokeWidth={2} />
-        ))}
+        {series.map((s) => <path key={s.key} d={linePath(s.key)} fill="none" stroke={s.color} strokeWidth={2} />)}
         {series.map((s) =>
           data.map((d, i) => {
             const v = d[s.key];
@@ -790,6 +657,310 @@ function TariffChart({ data }: { data: Array<{ quarter: string; VGF1: number | n
           })
         )}
       </svg>
+    </div>
+  );
+}
+
+function ScatterChart({
+  points, onClick,
+}: {
+  points: Array<{ mwh: number; tariff: number; band: VGFBand; label: string; nit: string }>;
+  onClick: (nit: string) => void;
+}) {
+  const [hover, setHover] = useState<string | null>(null);
+
+  const W = 560;
+  const H = 240;
+  const PAD_L = 44;
+  const PAD_R = 12;
+  const PAD_T = 16;
+  const PAD_B = 36;
+  const innerW = W - PAD_L - PAD_R;
+  const innerH = H - PAD_T - PAD_B;
+
+  const xVals = points.map((p) => p.mwh);
+  const yVals = points.map((p) => p.tariff);
+  const xMin = 0;
+  const xMax = Math.max(...xVals) * 1.1;
+  const yMin = Math.min(...yVals) * 0.85;
+  const yMax = Math.max(...yVals) * 1.05;
+
+  const x = (v: number) => PAD_L + ((v - xMin) / (xMax - xMin)) * innerW;
+  const y = (v: number) => PAD_T + innerH - ((v - yMin) / (yMax - yMin)) * innerH;
+
+  const xTicks = 5;
+  const yTicks = 4;
+
+  return (
+    <div>
+      <div className="flex items-center gap-3 mb-2 text-xs">
+        {BANDS.slice().reverse().map((b) => (
+          <div key={b} className="flex items-center gap-1.5">
+            <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: BAND_COLOR[b] }} />
+            <span className="text-gray-500">{b}</span>
+          </div>
+        ))}
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto">
+        {/* Y grid */}
+        {Array.from({ length: yTicks + 1 }, (_, i) => yMin + ((yMax - yMin) * i) / yTicks).map((v, i) => (
+          <g key={`y${i}`}>
+            <line x1={PAD_L} x2={W - PAD_R} y1={y(v)} y2={y(v)} stroke="currentColor" strokeOpacity={0.08} strokeDasharray="3,3" />
+            <text x={PAD_L - 4} y={y(v) + 3} textAnchor="end" fontSize={9} fill="currentColor" fillOpacity={0.5}>₹{(v / 100000).toFixed(1)}L</text>
+          </g>
+        ))}
+        {/* X axis labels */}
+        {Array.from({ length: xTicks + 1 }, (_, i) => xMin + ((xMax - xMin) * i) / xTicks).map((v, i) => (
+          <text key={`x${i}`} x={x(v)} y={H - 18} textAnchor="middle" fontSize={9} fill="currentColor" fillOpacity={0.6}>
+            {v >= 1000 ? `${(v / 1000).toFixed(1)}k` : Math.round(v)}
+          </text>
+        ))}
+        <text x={PAD_L + innerW / 2} y={H - 4} textAnchor="middle" fontSize={9} fill="currentColor" fillOpacity={0.6}>MWh capacity</text>
+        {/* Points */}
+        {points.map((p) => (
+          <g key={p.nit}>
+            <circle
+              cx={x(p.mwh)}
+              cy={y(p.tariff)}
+              r={hover === p.nit ? 7 : 5}
+              fill={BAND_COLOR[p.band]}
+              fillOpacity={0.7}
+              stroke={hover === p.nit ? "#0D1F3C" : "none"}
+              strokeWidth={2}
+              style={{ cursor: "pointer", transition: "all 0.15s" }}
+              onMouseEnter={() => setHover(p.nit)}
+              onMouseLeave={() => setHover(null)}
+              onClick={() => onClick(p.nit)}
+            />
+          </g>
+        ))}
+      </svg>
+      {hover && (() => {
+        const p = points.find((x) => x.nit === hover);
+        if (!p) return null;
+        return (
+          <div className="text-xs bg-[var(--bg-subtle)] rounded p-2 mt-2">
+            <div className="font-semibold text-gray-100">{p.label}</div>
+            <div className="text-gray-500">
+              {fmtMWh(p.mwh)} · {fmtTariff(p.tariff)}/MW/Mo · <span style={{ color: BAND_COLOR[p.band] }}>{p.band}</span>
+            </div>
+          </div>
+        );
+      })()}
+    </div>
+  );
+}
+
+function StackedBarChart({
+  data,
+}: {
+  data: Array<{ quarter: string; VGF2: number; VGF1: number; "No-VGF": number; ts: number }>;
+}) {
+  const W = 560;
+  const H = 240;
+  const PAD_L = 40;
+  const PAD_R = 12;
+  const PAD_T = 16;
+  const PAD_B = 36;
+  const innerW = W - PAD_L - PAD_R;
+  const innerH = H - PAD_T - PAD_B;
+
+  const totals = data.map((d) => d.VGF2 + d.VGF1 + d["No-VGF"]);
+  const yMax = Math.max(...totals) * 1.1;
+  const barW = innerW / data.length * 0.7;
+  const barGap = innerW / data.length * 0.3;
+  const x = (i: number) => PAD_L + i * (barW + barGap) + barGap / 2;
+  const y = (v: number) => PAD_T + innerH - (v / yMax) * innerH;
+  const h = (v: number) => (v / yMax) * innerH;
+
+  const yTicks = 4;
+  const tickVals = Array.from({ length: yTicks + 1 }, (_, i) => (yMax * i) / yTicks);
+
+  return (
+    <div>
+      <div className="flex items-center gap-3 mb-2 text-xs">
+        {BANDS.slice().reverse().map((b) => (
+          <div key={b} className="flex items-center gap-1.5">
+            <span className="inline-block w-3 h-3 rounded" style={{ background: BAND_COLOR[b] }} />
+            <span className="text-gray-500">{b}</span>
+          </div>
+        ))}
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto">
+        {tickVals.map((v, i) => (
+          <g key={i}>
+            <line x1={PAD_L} x2={W - PAD_R} y1={y(v)} y2={y(v)} stroke="currentColor" strokeOpacity={0.08} strokeDasharray="3,3" />
+            <text x={PAD_L - 4} y={y(v) + 3} textAnchor="end" fontSize={9} fill="currentColor" fillOpacity={0.5}>
+              {v >= 1000 ? `${(v / 1000).toFixed(1)}GW` : `${Math.round(v)}MW`}
+            </text>
+          </g>
+        ))}
+        {data.map((d, i) => {
+          let yCursor = innerH + PAD_T;
+          const segments: Array<{ band: VGFBand; mw: number; yTop: number; height: number }> = [];
+          for (const band of BANDS) {
+            const mw = d[band];
+            if (mw <= 0) continue;
+            const segH = h(mw);
+            yCursor -= segH;
+            segments.push({ band, mw, yTop: yCursor, height: segH });
+          }
+          return (
+            <g key={d.quarter}>
+              {segments.map((s) => (
+                <rect
+                  key={s.band}
+                  x={x(i)}
+                  y={s.yTop}
+                  width={barW}
+                  height={s.height}
+                  fill={BAND_COLOR[s.band]}
+                />
+              ))}
+              <text x={x(i) + barW / 2} y={H - 18} textAnchor="middle" fontSize={9} fill="currentColor" fillOpacity={0.6}>
+                {d.quarter}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
+function DonutChart({
+  data,
+}: {
+  data: Array<{ band: VGFBand; mw: number; pctMW: number; count: number }>;
+}) {
+  const total = data.reduce((s, d) => s + d.mw, 0);
+  if (total === 0) return <Empty />;
+
+  const size = 200;
+  const cx = size / 2;
+  const cy = size / 2;
+  const rOuter = 90;
+  const rInner = 55;
+
+  let cursor = -Math.PI / 2;
+  const arcs = data
+    .filter((d) => d.mw > 0)
+    .map((d) => {
+      const angle = (d.mw / total) * 2 * Math.PI;
+      const start = cursor;
+      const end = cursor + angle;
+      cursor = end;
+      const x1 = cx + Math.cos(start) * rOuter;
+      const y1 = cy + Math.sin(start) * rOuter;
+      const x2 = cx + Math.cos(end) * rOuter;
+      const y2 = cy + Math.sin(end) * rOuter;
+      const x3 = cx + Math.cos(end) * rInner;
+      const y3 = cy + Math.sin(end) * rInner;
+      const x4 = cx + Math.cos(start) * rInner;
+      const y4 = cy + Math.sin(start) * rInner;
+      const largeArc = angle > Math.PI ? 1 : 0;
+      const path = [
+        `M ${x1} ${y1}`,
+        `A ${rOuter} ${rOuter} 0 ${largeArc} 1 ${x2} ${y2}`,
+        `L ${x3} ${y3}`,
+        `A ${rInner} ${rInner} 0 ${largeArc} 0 ${x4} ${y4}`,
+        "Z",
+      ].join(" ");
+      return { ...d, path };
+    });
+
+  return (
+    <div className="flex items-center gap-6">
+      <svg viewBox={`0 0 ${size} ${size}`} width={size} height={size} className="shrink-0">
+        {arcs.map((a) => (
+          <path key={a.band} d={a.path} fill={BAND_COLOR[a.band]} />
+        ))}
+        <text x={cx} y={cy - 4} textAnchor="middle" fontSize={11} fill="currentColor" fillOpacity={0.6}>
+          Total
+        </text>
+        <text x={cx} y={cy + 12} textAnchor="middle" fontSize={14} fontWeight={700} fill="currentColor">
+          {fmtMW(total)}
+        </text>
+      </svg>
+      <div className="flex-1 space-y-2">
+        {data.map((d) => (
+          <div key={d.band} className="text-xs">
+            <div className="flex items-baseline justify-between mb-1">
+              <span className="flex items-center gap-2 font-medium text-gray-100">
+                <span className="inline-block w-3 h-3 rounded" style={{ background: BAND_COLOR[d.band] }} />
+                {d.band}
+              </span>
+              <span className="text-gray-500">{d.count} award{d.count === 1 ? "" : "s"}</span>
+            </div>
+            <div className="flex items-baseline justify-between">
+              <span className="text-gray-500">{fmtMW(d.mw)}</span>
+              <span className="font-semibold text-gray-100">{d.pctMW.toFixed(0)}%</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function HorizontalBars({
+  data,
+}: {
+  data: Array<{ label: string; value: number; meta?: string; formatted?: string }>;
+}) {
+  const max = Math.max(...data.map((d) => d.value), 1);
+  return (
+    <div className="space-y-2">
+      {data.map((d, i) => {
+        const pct = (d.value / max) * 100;
+        return (
+          <div key={i} className="text-xs">
+            <div className="flex items-baseline justify-between mb-1">
+              <span className="font-medium text-gray-100 truncate" title={d.label}>{d.label}</span>
+              <span className="font-semibold text-gray-100 ml-2 shrink-0">{d.formatted ?? d.value.toLocaleString()}</span>
+            </div>
+            <div className="bg-[var(--bg-subtle)] rounded h-3 relative overflow-hidden mb-1">
+              <div
+                className="h-full bg-gradient-to-r from-[#0D1F3C] to-[#1f3a6e]"
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+            {d.meta && <div className="text-[10px] text-gray-500">{d.meta}</div>}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function CompetitionBars({
+  data,
+}: {
+  data: Array<{ range: string; avg: number; tenderCount: number; max: number }>;
+}) {
+  const cap = 25;
+  return (
+    <div className="space-y-3">
+      {data.map((c) => {
+        const pct = Math.min(100, (c.avg / cap) * 100);
+        const color = c.avg < 5 ? "#10b981" : c.avg < 10 ? "#f59e0b" : "#ef4444";
+        return (
+          <div key={c.range} className="text-xs">
+            <div className="flex items-baseline justify-between mb-1">
+              <span className="font-medium text-gray-100">{c.range}</span>
+              <span className="text-gray-500">
+                <span className="font-semibold text-gray-100">{c.avg.toFixed(1)}</span> avg bidders
+                {c.tenderCount > 0 && <span> · {c.tenderCount} tender{c.tenderCount === 1 ? "" : "s"}</span>}
+                {c.max > 0 && <span> · max {c.max}</span>}
+              </span>
+            </div>
+            <div className="bg-[var(--bg-subtle)] rounded h-3 relative overflow-hidden">
+              <div className="h-full" style={{ width: `${pct}%`, background: color }} />
+            </div>
+          </div>
+        );
+      })}
+      <p className="text-[11px] text-gray-400 mt-2">Green = under 5 bidders typical, amber = moderate, red = crowded.</p>
     </div>
   );
 }
