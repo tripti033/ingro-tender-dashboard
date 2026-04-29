@@ -12,15 +12,35 @@ import Sidebar from "@/components/Sidebar";
 type TimeRange = "1y" | "2y" | "all";
 type DurationBucket = "2hr" | "3hr" | "4hr+";
 type VGFBand = "No-VGF" | "VGF1" | "VGF2";
+type Category = "All" | "Standalone" | "FDRE" | "S+S" | "PSP" | "Hybrid";
 
 const DURATIONS: DurationBucket[] = ["2hr", "3hr", "4hr+"];
 const BANDS: VGFBand[] = ["No-VGF", "VGF1", "VGF2"];
+const CATEGORIES: Category[] = ["All", "Standalone", "FDRE", "S+S", "PSP", "Hybrid"];
 
 const BAND_COLOR: Record<VGFBand, string> = {
   "VGF2": "#10b981",
   "VGF1": "#f59e0b",
   "No-VGF": "#94a3b8",
 };
+
+// Category palette — used in donut + horizontal bars. Picked so each category
+// stays distinct from the VGF band colours used elsewhere on the page.
+const CATEGORY_COLOR: Record<string, string> = {
+  "Standalone": "#3b82f6",
+  "FDRE": "#8b5cf6",
+  "S+S": "#ec4899",
+  "PSP": "#14b8a6",
+  "Pump Storage Plant": "#14b8a6",
+  "Hybrid": "#f97316",
+  "Other": "#6b7280",
+};
+
+function normCategory(c: string | null | undefined): string {
+  if (!c) return "Other";
+  if (c === "Pump Storage Plant") return "PSP";
+  return c;
+}
 
 function fmtCr(rs: number | null | undefined): string {
   if (rs == null || isNaN(rs) || rs === 0) return "—";
@@ -97,7 +117,20 @@ function AnalyticsContent() {
   const [, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState<TimeRange>("all");
+  const [category, setCategory] = useState<Category>("All");
   const [selectedCell, setSelectedCell] = useState<{ dur: DurationBucket; band: VGFBand } | null>(null);
+
+  const matchesCategory = (t: Tender) => {
+    if (category === "All") return true;
+    if (category === "PSP") return t.category === "PSP" || t.category === "Pump Storage Plant";
+    return t.category === category;
+  };
+
+  const matchesCategoryBid = (b: Bid) => {
+    if (category === "All") return true;
+    if (category === "PSP") return b.category === "PSP" || b.category === "Pump Storage Plant";
+    return b.category === category;
+  };
 
   useEffect(() => {
     Promise.all([getTenders(), getBids(), getCompanies()])
@@ -108,12 +141,23 @@ function AnalyticsContent() {
   const awarded = useMemo(() => {
     return tenders.filter((t) => {
       if (!t.tariffRsPerMwPerMonth) return false;
+      if (!matchesCategory(t)) return false;
       const ad = tsDate(t.awardDate) || tsDate(t.firstSeenAt);
       return withinRange(ad, range);
     });
-  }, [tenders, range]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenders, range, category]);
 
-  const activeAll = useMemo(() => tenders.filter(isActive), [tenders]);
+  const activeAll = useMemo(
+    () => tenders.filter((t) => isActive(t) && matchesCategory(t)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [tenders, category]
+  );
+
+  // Always-unfiltered view of all active tenders — used by the Category mix
+  // panel so its donut still shows every category even when the user has
+  // filtered the rest of the page down.
+  const activeAllUnfiltered = useMemo(() => tenders.filter(isActive), [tenders]);
 
   // ── Pricing grid ──
   const grid = useMemo(() => {
@@ -193,6 +237,7 @@ function AnalyticsContent() {
     const wins = new Map<string, { name: string; wins: number; totalMWh: number; tariffs: number[]; states: Set<string> }>();
     for (const b of bids) {
       if (b.result !== "won") continue;
+      if (!matchesCategoryBid(b)) continue;
       const id = b.companyId;
       if (!id) continue;
       if (!wins.has(id)) wins.set(id, { name: b.companyName || id, wins: 0, totalMWh: 0, tariffs: [], states: new Set() });
@@ -212,7 +257,8 @@ function AnalyticsContent() {
       }))
       .sort((a, b) => b.totalMWh - a.totalMWh || b.wins - a.wins)
       .slice(0, 10);
-  }, [bids]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bids, category]);
 
   // ── Competition density ──
   const competition = useMemo(() => {
@@ -228,6 +274,7 @@ function AnalyticsContent() {
       "1+ GW": [] as number[],
     };
     for (const t of tenders) {
+      if (!matchesCategory(t)) continue;
       const n = byTender.get(t.nitNumber);
       if (!n || n === 0) continue;
       const mw = t.powerMW;
@@ -241,30 +288,34 @@ function AnalyticsContent() {
       tenderCount: counts.length,
       max: counts.length > 0 ? Math.max(...counts) : 0,
     }));
-  }, [tenders, bids]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenders, bids, category]);
 
-  // ── VGF band distribution donut ──
-  const bandMix = useMemo(() => {
-    const counts: Record<VGFBand, number> = { "VGF2": 0, "VGF1": 0, "No-VGF": 0 };
-    let totalMW = 0;
-    const mwCounts: Record<VGFBand, number> = { "VGF2": 0, "VGF1": 0, "No-VGF": 0 };
-    for (const t of awarded) {
-      const band = t.tariffBand;
-      if (band === "VGF1" || band === "VGF2" || band === "No-VGF") {
-        counts[band]++;
-        if (t.powerMW) {
-          mwCounts[band] += t.powerMW;
-          totalMW += t.powerMW;
-        }
+  // ── Category mix (active pipeline) — always shows all categories,
+  //    independent of the page-level category filter so the user can see the
+  //    full breakdown when picking which slice to drill into.
+  const categoryMixPipeline = useMemo(() => {
+    const counts = new Map<string, { count: number; mw: number }>();
+    let total = 0;
+    for (const t of activeAllUnfiltered) {
+      const cat = normCategory(t.category);
+      if (!counts.has(cat)) counts.set(cat, { count: 0, mw: 0 });
+      const c = counts.get(cat)!;
+      c.count++;
+      if (t.powerMW) {
+        c.mw += t.powerMW;
+        total += t.powerMW;
       }
     }
-    return BANDS.map((b) => ({
-      band: b,
-      count: counts[b],
-      mw: mwCounts[b],
-      pctMW: totalMW > 0 ? (mwCounts[b] / totalMW) * 100 : 0,
-    }));
-  }, [awarded]);
+    return Array.from(counts.entries())
+      .map(([cat, v]) => ({
+        category: cat,
+        count: v.count,
+        mw: v.mw,
+        pctMW: total > 0 ? (v.mw / total) * 100 : 0,
+      }))
+      .sort((a, b) => b.mw - a.mw);
+  }, [activeAllUnfiltered]);
 
   const kpis = useMemo(() => {
     const pipelineMW = activeAll.reduce((s, t) => s + (t.powerMW || 0), 0);
@@ -286,12 +337,27 @@ function AnalyticsContent() {
       <Sidebar />
 
       <div className="sidebar-content sticky top-0 z-40 bg-[var(--bg-card)] border-b px-6 py-3">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           <h1 className="text-lg font-bold text-gray-100">Analytics</h1>
           <span className="text-xs text-gray-400 hidden md:inline">
-            What the {awarded.length} awarded tenders + {bids.filter((b) => b.result === "won").length} bid records tell us
+            {awarded.length} awarded · {topWinners.length > 0 ? `${topWinners.length} active winners` : "0 winners"}
+            {category !== "All" ? ` · filtered to ${category}` : ""}
           </span>
-          <div className="ml-auto flex items-center gap-1 text-xs">
+          <div className="ml-auto flex flex-wrap items-center gap-1 text-xs">
+            {CATEGORIES.map((c) => (
+              <button
+                key={c}
+                onClick={() => setCategory(c)}
+                className={`px-2.5 py-1.5 rounded-lg transition-colors ${
+                  category === c
+                    ? "bg-[#0D1F3C] text-white"
+                    : "text-gray-500 hover:bg-[var(--bg-subtle)]"
+                }`}
+              >
+                {c}
+              </button>
+            ))}
+            <span className="mx-2 text-gray-300">|</span>
             {(["1y", "2y", "all"] as TimeRange[]).map((r) => (
               <button
                 key={r}
@@ -439,13 +505,20 @@ function AnalyticsContent() {
               </Panel>
 
               <Panel
-                title="VGF band split"
-                subtitle="Share of awarded MW by VGF tranche. Tells the story of the market over time in one ring."
+                title="Pipeline by category"
+                subtitle="Share of active MW by tender type. Click a slice in the header to filter the rest of the page."
               >
-                {bandMix.every((b) => b.mw === 0) ? (
-                  <Empty />
+                {categoryMixPipeline.length === 0 ? (
+                  <Empty hint="No active pipeline yet." />
                 ) : (
-                  <DonutChart data={bandMix} />
+                  <CategoryDonut
+                    data={categoryMixPipeline}
+                    selected={category === "All" ? null : category === "PSP" ? "PSP" : category}
+                    onSelect={(cat) => {
+                      const next = (cat === category || cat == null) ? "All" : (cat as Category);
+                      setCategory(next);
+                    }}
+                  />
                 )}
               </Panel>
             </div>
@@ -828,10 +901,12 @@ function StackedBarChart({
   );
 }
 
-function DonutChart({
-  data,
+function CategoryDonut({
+  data, selected, onSelect,
 }: {
-  data: Array<{ band: VGFBand; mw: number; pctMW: number; count: number }>;
+  data: Array<{ category: string; mw: number; pctMW: number; count: number }>;
+  selected: string | null;
+  onSelect: (cat: string | null) => void;
 }) {
   const total = data.reduce((s, d) => s + d.mw, 0);
   if (total === 0) return <Empty />;
@@ -872,32 +947,50 @@ function DonutChart({
   return (
     <div className="flex items-center gap-6">
       <svg viewBox={`0 0 ${size} ${size}`} width={size} height={size} className="shrink-0">
-        {arcs.map((a) => (
-          <path key={a.band} d={a.path} fill={BAND_COLOR[a.band]} />
-        ))}
-        <text x={cx} y={cy - 4} textAnchor="middle" fontSize={11} fill="currentColor" fillOpacity={0.6}>
-          Total
-        </text>
-        <text x={cx} y={cy + 12} textAnchor="middle" fontSize={14} fontWeight={700} fill="currentColor">
-          {fmtMW(total)}
-        </text>
+        {arcs.map((a) => {
+          const isDim = selected != null && selected !== a.category;
+          return (
+            <path
+              key={a.category}
+              d={a.path}
+              fill={CATEGORY_COLOR[a.category] || CATEGORY_COLOR.Other}
+              opacity={isDim ? 0.25 : 1}
+              style={{ cursor: "pointer", transition: "opacity 0.15s" }}
+              onClick={() => onSelect(a.category)}
+            />
+          );
+        })}
+        <text x={cx} y={cy - 4} textAnchor="middle" fontSize={11} fill="currentColor" fillOpacity={0.6}>Total</text>
+        <text x={cx} y={cy + 12} textAnchor="middle" fontSize={14} fontWeight={700} fill="currentColor">{fmtMW(total)}</text>
       </svg>
       <div className="flex-1 space-y-2">
-        {data.map((d) => (
-          <div key={d.band} className="text-xs">
-            <div className="flex items-baseline justify-between mb-1">
-              <span className="flex items-center gap-2 font-medium text-gray-100">
-                <span className="inline-block w-3 h-3 rounded" style={{ background: BAND_COLOR[d.band] }} />
-                {d.band}
-              </span>
-              <span className="text-gray-500">{d.count} award{d.count === 1 ? "" : "s"}</span>
-            </div>
-            <div className="flex items-baseline justify-between">
-              <span className="text-gray-500">{fmtMW(d.mw)}</span>
-              <span className="font-semibold text-gray-100">{d.pctMW.toFixed(0)}%</span>
-            </div>
-          </div>
-        ))}
+        {data.map((d) => {
+          const isSelected = selected === d.category;
+          return (
+            <button
+              key={d.category}
+              onClick={() => onSelect(d.category)}
+              className={`w-full text-left text-xs p-1.5 -mx-1.5 rounded transition-colors ${
+                isSelected ? "bg-[var(--bg-subtle)]" : "hover:bg-[var(--bg-subtle)]"
+              }`}
+            >
+              <div className="flex items-baseline justify-between mb-1">
+                <span className="flex items-center gap-2 font-medium text-gray-100">
+                  <span
+                    className="inline-block w-3 h-3 rounded"
+                    style={{ background: CATEGORY_COLOR[d.category] || CATEGORY_COLOR.Other }}
+                  />
+                  {d.category}
+                </span>
+                <span className="text-gray-500">{d.count} tender{d.count === 1 ? "" : "s"}</span>
+              </div>
+              <div className="flex items-baseline justify-between">
+                <span className="text-gray-500">{fmtMW(d.mw)}</span>
+                <span className="font-semibold text-gray-100">{d.pctMW.toFixed(0)}%</span>
+              </div>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
