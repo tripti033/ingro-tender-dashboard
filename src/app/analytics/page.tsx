@@ -204,17 +204,27 @@ function AnalyticsContent() {
       }));
   }, [awarded]);
 
-  // ── Scatter: capacity vs tariff ──
-  const scatterPoints = useMemo(() => {
-    return awarded
-      .filter((t) => t.energyMWh && t.tariffRsPerMwPerMonth && t.tariffBand)
-      .map((t) => ({
-        mwh: t.energyMWh!,
-        tariff: t.tariffRsPerMwPerMonth!,
-        band: t.tariffBand as VGFBand,
-        label: `${t.authority || "?"} ${t.powerMW}MW/${t.energyMWh}MWh`,
-        nit: t.nitNumber,
-      }));
+  // ── Tariff range by VGF band ──
+  // Replaces the old scatter: one row per VGF band, showing min → max range
+  // with the median marked. Far easier to read the headline ("VGF2 is tight,
+  // No-VGF was wild") at a glance than a cloud of dots.
+  const tariffRanges = useMemo(() => {
+    const out = BANDS.map((band) => {
+      const tariffs = awarded
+        .filter((t) => t.tariffBand === band && t.tariffRsPerMwPerMonth)
+        .map((t) => t.tariffRsPerMwPerMonth!);
+      if (tariffs.length === 0) return { band, min: 0, max: 0, median: 0, count: 0, lowest: null, highest: null };
+      const sorted = [...tariffs].sort((a, b) => a - b);
+      const min = sorted[0];
+      const max = sorted[sorted.length - 1];
+      const med = sorted.length % 2 === 1
+        ? sorted[(sorted.length - 1) / 2]
+        : (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2;
+      const lowest = awarded.find((t) => t.tariffBand === band && t.tariffRsPerMwPerMonth === min) || null;
+      const highest = awarded.find((t) => t.tariffBand === band && t.tariffRsPerMwPerMonth === max) || null;
+      return { band, min, max, median: med, count: tariffs.length, lowest, highest };
+    });
+    return out;
   }, [awarded]);
 
   // ── Quarterly MW awarded (stacked bar) ──
@@ -480,13 +490,16 @@ function AnalyticsContent() {
               </Panel>
 
               <Panel
-                title="Capacity vs Tariff"
-                subtitle="Each dot is one award. X = MWh, Y = ₹/MW/Month. Color by VGF band. Bigger projects usually price lower."
+                title="Tariff range by VGF band"
+                subtitle="Min, median, max ₹/MW/Month for each band. The shorter the bar, the tighter the market is pricing."
               >
-                {scatterPoints.length === 0 ? (
-                  <Empty hint="Need awarded tenders with capacity + tariff." />
+                {tariffRanges.every((r) => r.count === 0) ? (
+                  <Empty hint="Need awarded tenders with tariff + VGF band." />
                 ) : (
-                  <ScatterChart points={scatterPoints} onClick={(nit) => router.push(`/tender/${encodeURIComponent(nit)}?from=/analytics`)} />
+                  <RangeByBand
+                    rows={tariffRanges}
+                    onClick={(nit) => router.push(`/tender/${encodeURIComponent(nit)}?from=/analytics`)}
+                  />
                 )}
               </Panel>
             </div>
@@ -734,92 +747,97 @@ function TariffChart({ data }: { data: Array<{ quarter: string; VGF1: number | n
   );
 }
 
-function ScatterChart({
-  points, onClick,
+function RangeByBand({
+  rows, onClick,
 }: {
-  points: Array<{ mwh: number; tariff: number; band: VGFBand; label: string; nit: string }>;
+  rows: Array<{ band: VGFBand; min: number; max: number; median: number; count: number; lowest: Tender | null; highest: Tender | null }>;
   onClick: (nit: string) => void;
 }) {
-  const [hover, setHover] = useState<string | null>(null);
+  const populated = rows.filter((r) => r.count > 0);
+  if (populated.length === 0) return <Empty />;
 
-  const W = 560;
-  const H = 240;
-  const PAD_L = 44;
-  const PAD_R = 12;
-  const PAD_T = 16;
-  const PAD_B = 36;
-  const innerW = W - PAD_L - PAD_R;
-  const innerH = H - PAD_T - PAD_B;
-
-  const xVals = points.map((p) => p.mwh);
-  const yVals = points.map((p) => p.tariff);
-  const xMin = 0;
-  const xMax = Math.max(...xVals) * 1.1;
-  const yMin = Math.min(...yVals) * 0.85;
-  const yMax = Math.max(...yVals) * 1.05;
-
-  const x = (v: number) => PAD_L + ((v - xMin) / (xMax - xMin)) * innerW;
-  const y = (v: number) => PAD_T + innerH - ((v - yMin) / (yMax - yMin)) * innerH;
-
-  const xTicks = 5;
-  const yTicks = 4;
+  const globalMin = Math.min(...populated.map((r) => r.min));
+  const globalMax = Math.max(...populated.map((r) => r.max));
+  const span = Math.max(globalMax - globalMin, 1);
+  // Pad the scale a little so the leftmost bar doesn't sit on the edge.
+  const pad = span * 0.05;
+  const scaleMin = Math.max(0, globalMin - pad);
+  const scaleMax = globalMax + pad;
+  const scaleSpan = scaleMax - scaleMin;
+  const pct = (v: number) => ((v - scaleMin) / scaleSpan) * 100;
 
   return (
-    <div>
-      <div className="flex items-center gap-3 mb-2 text-xs">
-        {BANDS.slice().reverse().map((b) => (
-          <div key={b} className="flex items-center gap-1.5">
-            <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: BAND_COLOR[b] }} />
-            <span className="text-gray-500">{b}</span>
-          </div>
-        ))}
-      </div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto">
-        {/* Y grid */}
-        {Array.from({ length: yTicks + 1 }, (_, i) => yMin + ((yMax - yMin) * i) / yTicks).map((v, i) => (
-          <g key={`y${i}`}>
-            <line x1={PAD_L} x2={W - PAD_R} y1={y(v)} y2={y(v)} stroke="currentColor" strokeOpacity={0.08} strokeDasharray="3,3" />
-            <text x={PAD_L - 4} y={y(v) + 3} textAnchor="end" fontSize={9} fill="currentColor" fillOpacity={0.5}>₹{(v / 100000).toFixed(1)}L</text>
-          </g>
-        ))}
-        {/* X axis labels */}
-        {Array.from({ length: xTicks + 1 }, (_, i) => xMin + ((xMax - xMin) * i) / xTicks).map((v, i) => (
-          <text key={`x${i}`} x={x(v)} y={H - 18} textAnchor="middle" fontSize={9} fill="currentColor" fillOpacity={0.6}>
-            {v >= 1000 ? `${(v / 1000).toFixed(1)}k` : Math.round(v)}
-          </text>
-        ))}
-        <text x={PAD_L + innerW / 2} y={H - 4} textAnchor="middle" fontSize={9} fill="currentColor" fillOpacity={0.6}>MWh capacity</text>
-        {/* Points */}
-        {points.map((p) => (
-          <g key={p.nit}>
-            <circle
-              cx={x(p.mwh)}
-              cy={y(p.tariff)}
-              r={hover === p.nit ? 7 : 5}
-              fill={BAND_COLOR[p.band]}
-              fillOpacity={0.7}
-              stroke={hover === p.nit ? "#0D1F3C" : "none"}
-              strokeWidth={2}
-              style={{ cursor: "pointer", transition: "all 0.15s" }}
-              onMouseEnter={() => setHover(p.nit)}
-              onMouseLeave={() => setHover(null)}
-              onClick={() => onClick(p.nit)}
-            />
-          </g>
-        ))}
-      </svg>
-      {hover && (() => {
-        const p = points.find((x) => x.nit === hover);
-        if (!p) return null;
+    <div className="space-y-4">
+      {rows.map((r) => {
+        if (r.count === 0) {
+          return (
+            <div key={r.band} className="text-xs">
+              <div className="flex items-baseline justify-between mb-1.5">
+                <span className="flex items-center gap-2 font-semibold text-gray-100">
+                  <span className="inline-block w-3 h-3 rounded" style={{ background: BAND_COLOR[r.band] }} />
+                  {r.band}
+                </span>
+                <span className="text-gray-400">no awards</span>
+              </div>
+              <div className="bg-[var(--bg-subtle)] rounded h-7 opacity-40" />
+            </div>
+          );
+        }
+        const left = pct(r.min);
+        const right = pct(r.max);
+        const width = Math.max(right - left, 2);
+        const medPct = pct(r.median);
         return (
-          <div className="text-xs bg-[var(--bg-subtle)] rounded p-2 mt-2">
-            <div className="font-semibold text-gray-100">{p.label}</div>
-            <div className="text-gray-500">
-              {fmtMWh(p.mwh)} · {fmtTariff(p.tariff)}/MW/Mo · <span style={{ color: BAND_COLOR[p.band] }}>{p.band}</span>
+          <div key={r.band} className="text-xs">
+            <div className="flex items-baseline justify-between mb-1.5">
+              <span className="flex items-center gap-2 font-semibold text-gray-100">
+                <span className="inline-block w-3 h-3 rounded" style={{ background: BAND_COLOR[r.band] }} />
+                {r.band}
+              </span>
+              <span className="text-gray-500">
+                <span className="font-semibold text-gray-100">{fmtTariff(r.median)}</span> median
+                {" · "}{r.count} award{r.count === 1 ? "" : "s"}
+              </span>
+            </div>
+            <div className="relative bg-[var(--bg-subtle)] rounded h-7">
+              <div
+                className="absolute top-0 bottom-0 rounded"
+                style={{
+                  left: `${left}%`,
+                  width: `${width}%`,
+                  background: BAND_COLOR[r.band],
+                  opacity: 0.85,
+                }}
+              />
+              {/* Median marker */}
+              <div
+                className="absolute top-0 bottom-0 w-0.5 bg-[#0D1F3C]"
+                style={{ left: `calc(${medPct}% - 1px)` }}
+                title={`Median ${fmtTariff(r.median)}`}
+              />
+            </div>
+            <div className="flex justify-between text-[10px] text-gray-500 mt-1 px-0.5">
+              <button
+                onClick={() => r.lowest && onClick(r.lowest.nitNumber)}
+                className={`text-left ${r.lowest ? "hover:text-gray-100 hover:underline" : ""}`}
+                disabled={!r.lowest}
+              >
+                low: {fmtTariff(r.min)}{r.lowest && r.lowest.authority ? ` · ${r.lowest.authority}` : ""}
+              </button>
+              <button
+                onClick={() => r.highest && onClick(r.highest.nitNumber)}
+                className={`text-right ${r.highest ? "hover:text-gray-100 hover:underline" : ""}`}
+                disabled={!r.highest}
+              >
+                high: {fmtTariff(r.max)}{r.highest && r.highest.authority ? ` · ${r.highest.authority}` : ""}
+              </button>
             </div>
           </div>
         );
-      })()}
+      })}
+      <p className="text-[11px] text-gray-400 mt-2">
+        Bar = full range of winning tariffs in that band. Dark line = median. Click low/high to open that tender.
+      </p>
     </div>
   );
 }
