@@ -8,6 +8,7 @@ import {
 } from "@/lib/firestore";
 import AuthGuard from "@/components/AuthGuard";
 import Sidebar from "@/components/Sidebar";
+import IndiaBessMap from "@/components/IndiaBessMap";
 
 type TimeRange = "1y" | "2y" | "all";
 type DurationBucket = "2hr" | "3hr" | "4hr+";
@@ -523,6 +524,9 @@ function AnalyticsContent() {
                 accent={kpis.cashLocked > 0 ? "text-amber-500" : "text-gray-400"}
               />
             </div>
+
+            {/* India BESS Map — national market context + state-by-state breakdown */}
+            <IndiaBessMap liveTenders={tenders} />
 
             {/* HERO: Pricing grid */}
             <Panel
