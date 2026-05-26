@@ -204,28 +204,50 @@ function AnalyticsContent() {
       }));
   }, [awarded]);
 
-  // ── Tariff range by VGF band ──
-  // Replaces the old scatter: one row per VGF band, showing min → max range
-  // with the median marked. Far easier to read the headline ("VGF2 is tight,
-  // No-VGF was wild") at a glance than a cloud of dots.
-  const tariffRanges = useMemo(() => {
-    const out = BANDS.map((band) => {
-      const tariffs = awarded
-        .filter((t) => t.tariffBand === band && t.tariffRsPerMwPerMonth)
-        .map((t) => t.tariffRsPerMwPerMonth!);
-      if (tariffs.length === 0) return { band, min: 0, max: 0, median: 0, count: 0, lowest: null, highest: null };
-      const sorted = [...tariffs].sort((a, b) => a - b);
-      const min = sorted[0];
-      const max = sorted[sorted.length - 1];
-      const med = sorted.length % 2 === 1
-        ? sorted[(sorted.length - 1) / 2]
-        : (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2;
-      const lowest = awarded.find((t) => t.tariffBand === band && t.tariffRsPerMwPerMonth === min) || null;
-      const highest = awarded.find((t) => t.tariffBand === band && t.tariffRsPerMwPerMonth === max) || null;
-      return { band, min, max, median: med, count: tariffs.length, lowest, highest };
-    });
-    return out;
+  // ── Tariff vs Duration scatter ──
+  // Bubble = MW, X = duration hours, Y = ₹/MW/Month, colour = VGF band.
+  // Reveals the duration-premium curve far more clearly than the 3×3 matrix
+  // because the slope upward (longer batteries cost more per MW/Mo) shows
+  // up directly in the eye.
+  const tariffDurationPoints = useMemo(() => {
+    return awarded
+      .filter((t) => t.tariffRsPerMwPerMonth && t.durationHours && t.tariffBand)
+      .map((t) => ({
+        duration: t.durationHours!,
+        tariff: t.tariffRsPerMwPerMonth!,
+        mw: t.powerMW || 50,
+        band: t.tariffBand as VGFBand,
+        label: `${t.authority || "?"} ${t.powerMW || "?"}MW/${t.energyMWh || "?"}MWh`,
+        nit: t.nitNumber,
+      }));
   }, [awarded]);
+
+  // Per-band median tariff at each integer duration, used to draw the trend
+  // line through each band's bubbles — that's the "premium curve" the chart
+  // is really there to show.
+  const bandTrendLines = useMemo(() => {
+    const out: Record<VGFBand, Array<{ duration: number; tariff: number }>> = {
+      "VGF1": [], "VGF2": [], "No-VGF": [],
+    };
+    for (const band of BANDS) {
+      const grouped = new Map<number, number[]>();
+      for (const p of tariffDurationPoints) {
+        if (p.band !== band) continue;
+        // Bucket to nearest 0.5h so 2.0 and 2.5 don't snap together
+        const key = Math.round(p.duration * 2) / 2;
+        if (!grouped.has(key)) grouped.set(key, []);
+        grouped.get(key)!.push(p.tariff);
+      }
+      out[band] = Array.from(grouped.entries())
+        .map(([duration, tariffs]) => ({
+          duration,
+          tariff: median(tariffs) || 0,
+        }))
+        .filter((x) => x.tariff > 0)
+        .sort((a, b) => a.duration - b.duration);
+    }
+    return out;
+  }, [tariffDurationPoints]);
 
   // ── Quarterly MW awarded (stacked bar) ──
   const quarterlyMW = useMemo(() => {
@@ -490,14 +512,15 @@ function AnalyticsContent() {
               </Panel>
 
               <Panel
-                title="Tariff range by VGF band"
-                subtitle="Min, median, max ₹/MW/Month for each band. The shorter the bar, the tighter the market is pricing."
+                title="Tariff vs Duration"
+                subtitle="Each bubble = one award. Y = ₹/MW/Month, X = duration in hours, bubble size = MW, colour = VGF band. The dotted curves show median tariff per band — slope upward = the duration premium."
               >
-                {tariffRanges.every((r) => r.count === 0) ? (
-                  <Empty hint="Need awarded tenders with tariff + VGF band." />
+                {tariffDurationPoints.length === 0 ? (
+                  <Empty hint="Need awarded tenders with tariff + duration." />
                 ) : (
-                  <RangeByBand
-                    rows={tariffRanges}
+                  <DurationScatter
+                    points={tariffDurationPoints}
+                    trendLines={bandTrendLines}
                     onClick={(nit) => router.push(`/tender/${encodeURIComponent(nit)}?from=/analytics`)}
                   />
                 )}
@@ -747,96 +770,173 @@ function TariffChart({ data }: { data: Array<{ quarter: string; VGF1: number | n
   );
 }
 
-function RangeByBand({
-  rows, onClick,
+function DurationScatter({
+  points, trendLines, onClick,
 }: {
-  rows: Array<{ band: VGFBand; min: number; max: number; median: number; count: number; lowest: Tender | null; highest: Tender | null }>;
+  points: Array<{ duration: number; tariff: number; mw: number; band: VGFBand; label: string; nit: string }>;
+  trendLines: Record<VGFBand, Array<{ duration: number; tariff: number }>>;
   onClick: (nit: string) => void;
 }) {
-  const populated = rows.filter((r) => r.count > 0);
-  if (populated.length === 0) return <Empty />;
+  const [hover, setHover] = useState<string | null>(null);
 
-  const globalMin = Math.min(...populated.map((r) => r.min));
-  const globalMax = Math.max(...populated.map((r) => r.max));
-  const span = Math.max(globalMax - globalMin, 1);
-  // Pad the scale a little so the leftmost bar doesn't sit on the edge.
-  const pad = span * 0.05;
-  const scaleMin = Math.max(0, globalMin - pad);
-  const scaleMax = globalMax + pad;
-  const scaleSpan = scaleMax - scaleMin;
-  const pct = (v: number) => ((v - scaleMin) / scaleSpan) * 100;
+  const W = 560;
+  const H = 280;
+  const PAD_L = 50;
+  const PAD_R = 16;
+  const PAD_T = 12;
+  const PAD_B = 44;
+  const innerW = W - PAD_L - PAD_R;
+  const innerH = H - PAD_T - PAD_B;
+
+  // Y-axis: trim the very top outlier (SECI-2022 No-VGF at ₹10.83L) so the
+  // bulk of the data isn't squashed into the bottom third. We mark trimmed
+  // points with a small upward arrow at the top of the chart.
+  const tariffs = points.map((p) => p.tariff).sort((a, b) => a - b);
+  // Use the 95th-percentile as a soft ceiling
+  const ceilingIdx = Math.max(0, Math.ceil(tariffs.length * 0.95) - 1);
+  const ceiling = tariffs[ceilingIdx] || tariffs[tariffs.length - 1] || 1;
+  const yMin = 0;
+  const yMax = ceiling * 1.08;
+
+  // X-axis: 0 → max duration (round up to next 0.5h)
+  const maxDur = Math.ceil(Math.max(5, ...points.map((p) => p.duration)) * 2) / 2;
+  const xMin = 0;
+  const xMax = maxDur;
+
+  // Bubble radius: sqrt-scaled by MW so big projects stand out but don't dominate
+  const maxMW = Math.max(...points.map((p) => p.mw), 1);
+  const minR = 5;
+  const maxR = 18;
+  const rOf = (mw: number) => minR + Math.sqrt(Math.max(mw, 0) / maxMW) * (maxR - minR);
+
+  // Deterministic jitter so overlapping points (most are at 2h or 4h) spread out
+  const jitter = (nit: string) => {
+    let h = 5381;
+    for (let i = 0; i < nit.length; i++) h = ((h * 33) ^ nit.charCodeAt(i)) | 0;
+    return (((h % 100) + 100) % 100 / 100 - 0.5) * 0.25; // ±0.125h
+  };
+
+  const x = (v: number) => PAD_L + ((v - xMin) / (xMax - xMin)) * innerW;
+  const y = (v: number) => PAD_T + innerH - ((Math.min(v, yMax) - yMin) / (yMax - yMin)) * innerH;
+
+  // Order so smaller bubbles render last (on top) — avoids large dim ones hiding small bright ones
+  const ordered = [...points].sort((a, b) => b.mw - a.mw);
+
+  const xTicks = [0, 1, 2, 3, 4, 5, 6, 7].filter((t) => t <= xMax);
+  const yTicks = 5;
+  const yTickVals = Array.from({ length: yTicks + 1 }, (_, i) => yMin + ((yMax - yMin) * i) / yTicks);
+
+  const trendPath = (band: VGFBand): string => {
+    const line = trendLines[band];
+    if (!line || line.length < 2) return "";
+    return line.map((p, i) => `${i === 0 ? "M" : "L"} ${x(p.duration)} ${y(p.tariff)}`).join(" ");
+  };
 
   return (
-    <div className="space-y-4">
-      {rows.map((r) => {
-        if (r.count === 0) {
+    <div>
+      <div className="flex items-center justify-between gap-3 mb-2 text-xs flex-wrap">
+        <div className="flex items-center gap-3">
+          {BANDS.slice().reverse().map((b) => (
+            <div key={b} className="flex items-center gap-1.5">
+              <span className="inline-block w-3 h-3 rounded-full" style={{ background: BAND_COLOR[b] }} />
+              <span className="text-gray-500">{b}</span>
+            </div>
+          ))}
+        </div>
+        <div className="flex items-center gap-2 text-gray-500">
+          <span>bubble = MW</span>
+          <svg width="64" height="20" viewBox="0 0 64 20" className="text-gray-400">
+            <circle cx="8" cy="10" r="4" fill="currentColor" fillOpacity="0.4" />
+            <circle cx="30" cy="10" r="7" fill="currentColor" fillOpacity="0.4" />
+            <circle cx="54" cy="10" r="10" fill="currentColor" fillOpacity="0.4" />
+          </svg>
+        </div>
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto">
+        {yTickVals.map((v, i) => (
+          <g key={`y${i}`}>
+            <line x1={PAD_L} x2={W - PAD_R} y1={y(v)} y2={y(v)} stroke="currentColor" strokeOpacity={0.08} strokeDasharray="3,3" />
+            <text x={PAD_L - 6} y={y(v) + 3} textAnchor="end" fontSize={9} fill="currentColor" fillOpacity={0.5}>
+              ₹{(v / 100000).toFixed(1)}L
+            </text>
+          </g>
+        ))}
+        {xTicks.map((t) => (
+          <g key={`x${t}`}>
+            <line x1={x(t)} x2={x(t)} y1={PAD_T} y2={PAD_T + innerH} stroke="currentColor" strokeOpacity={0.05} />
+            <text x={x(t)} y={H - 24} textAnchor="middle" fontSize={9} fill="currentColor" fillOpacity={0.6}>
+              {t}h
+            </text>
+          </g>
+        ))}
+        <text x={PAD_L + innerW / 2} y={H - 8} textAnchor="middle" fontSize={9} fill="currentColor" fillOpacity={0.6}>
+          Duration (hours)
+        </text>
+
+        {/* Trend lines per band — the duration premium curve */}
+        {BANDS.map((band) => {
+          const path = trendPath(band);
+          if (!path) return null;
           return (
-            <div key={r.band} className="text-xs">
-              <div className="flex items-baseline justify-between mb-1.5">
-                <span className="flex items-center gap-2 font-semibold text-gray-100">
-                  <span className="inline-block w-3 h-3 rounded" style={{ background: BAND_COLOR[r.band] }} />
-                  {r.band}
-                </span>
-                <span className="text-gray-400">no awards</span>
-              </div>
-              <div className="bg-[var(--bg-subtle)] rounded h-7 opacity-40" />
-            </div>
+            <path
+              key={`trend-${band}`}
+              d={path}
+              fill="none"
+              stroke={BAND_COLOR[band]}
+              strokeWidth={1.5}
+              strokeDasharray="5,3"
+              opacity={0.7}
+            />
           );
-        }
-        const left = pct(r.min);
-        const right = pct(r.max);
-        const width = Math.max(right - left, 2);
-        const medPct = pct(r.median);
+        })}
+
+        {/* Bubbles (larger first, smaller on top) */}
+        {ordered.map((p) => {
+          const jx = p.duration + jitter(p.nit);
+          const trimmed = p.tariff > yMax;
+          const cy = trimmed ? PAD_T + 6 : y(p.tariff);
+          return (
+            <g key={p.nit}>
+              <circle
+                cx={x(jx)}
+                cy={cy}
+                r={rOf(p.mw)}
+                fill={BAND_COLOR[p.band]}
+                fillOpacity={hover === p.nit ? 0.95 : 0.6}
+                stroke={hover === p.nit ? "#0D1F3C" : "white"}
+                strokeWidth={hover === p.nit ? 2 : 1}
+                style={{ cursor: "pointer", transition: "all 0.15s" }}
+                onMouseEnter={() => setHover(p.nit)}
+                onMouseLeave={() => setHover(null)}
+                onClick={() => onClick(p.nit)}
+              />
+              {trimmed && (
+                <text x={x(jx)} y={cy - rOf(p.mw) - 2} textAnchor="middle" fontSize={9} fill={BAND_COLOR[p.band]}>
+                  ↑
+                </text>
+              )}
+            </g>
+          );
+        })}
+      </svg>
+      {hover && (() => {
+        const p = points.find((x) => x.nit === hover);
+        if (!p) return null;
+        const trimmed = p.tariff > yMax;
         return (
-          <div key={r.band} className="text-xs">
-            <div className="flex items-baseline justify-between mb-1.5">
-              <span className="flex items-center gap-2 font-semibold text-gray-100">
-                <span className="inline-block w-3 h-3 rounded" style={{ background: BAND_COLOR[r.band] }} />
-                {r.band}
-              </span>
-              <span className="text-gray-500">
-                <span className="font-semibold text-gray-100">{fmtTariff(r.median)}</span> median
-                {" · "}{r.count} award{r.count === 1 ? "" : "s"}
-              </span>
-            </div>
-            <div className="relative bg-[var(--bg-subtle)] rounded h-7">
-              <div
-                className="absolute top-0 bottom-0 rounded"
-                style={{
-                  left: `${left}%`,
-                  width: `${width}%`,
-                  background: BAND_COLOR[r.band],
-                  opacity: 0.85,
-                }}
-              />
-              {/* Median marker */}
-              <div
-                className="absolute top-0 bottom-0 w-0.5 bg-[#0D1F3C]"
-                style={{ left: `calc(${medPct}% - 1px)` }}
-                title={`Median ${fmtTariff(r.median)}`}
-              />
-            </div>
-            <div className="flex justify-between text-[10px] text-gray-500 mt-1 px-0.5">
-              <button
-                onClick={() => r.lowest && onClick(r.lowest.nitNumber)}
-                className={`text-left ${r.lowest ? "hover:text-gray-100 hover:underline" : ""}`}
-                disabled={!r.lowest}
-              >
-                low: {fmtTariff(r.min)}{r.lowest && r.lowest.authority ? ` · ${r.lowest.authority}` : ""}
-              </button>
-              <button
-                onClick={() => r.highest && onClick(r.highest.nitNumber)}
-                className={`text-right ${r.highest ? "hover:text-gray-100 hover:underline" : ""}`}
-                disabled={!r.highest}
-              >
-                high: {fmtTariff(r.max)}{r.highest && r.highest.authority ? ` · ${r.highest.authority}` : ""}
-              </button>
+          <div className="text-xs bg-[var(--bg-subtle)] rounded p-2 mt-2">
+            <div className="font-semibold text-gray-100">{p.label}</div>
+            <div className="text-gray-500">
+              {p.duration}h · {fmtTariff(p.tariff)}/MW/Mo · {Math.round(p.mw)} MW ·{" "}
+              <span style={{ color: BAND_COLOR[p.band] }}>{p.band}</span>
+              {trimmed && <span className="text-amber-600 ml-2">(off-chart — historical outlier)</span>}
             </div>
           </div>
         );
-      })}
+      })()}
       <p className="text-[11px] text-gray-400 mt-2">
-        Bar = full range of winning tariffs in that band. Dark line = median. Click low/high to open that tender.
+        Dotted lines = median tariff per band at each duration. Their upward slope <em>is</em> the duration premium.
+        Click a bubble to open that tender.
       </p>
     </div>
   );
