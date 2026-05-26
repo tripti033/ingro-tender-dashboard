@@ -349,6 +349,84 @@ function AnalyticsContent() {
       .sort((a, b) => b.mw - a.mw);
   }, [activeAllUnfiltered]);
 
+  // ── State tariff heatmap ──
+  // Median ₹/MW/Month per state across awarded tenders. Answers "where is it
+  // lucrative to win?" (high tariff) vs "where is the market squeezed?" (low).
+  const stateTariffs = useMemo(() => {
+    const byState = new Map<string, number[]>();
+    for (const t of awarded) {
+      const s = (t.state || "").trim();
+      if (!s || !t.tariffRsPerMwPerMonth) continue;
+      if (!byState.has(s)) byState.set(s, []);
+      byState.get(s)!.push(t.tariffRsPerMwPerMonth);
+    }
+    return Array.from(byState.entries())
+      .map(([state, tariffs]) => ({
+        state,
+        median: median(tariffs) || 0,
+        count: tariffs.length,
+      }))
+      .sort((a, b) => b.median - a.median);
+  }, [awarded]);
+
+  // ── Authority responsiveness ──
+  // Avg days from bid-submission deadline → award date, per authority.
+  // Sparse today (most live tenders lack an awardDate) — will fill in as the
+  // result tracker matures.
+  const authorityResponsiveness = useMemo(() => {
+    const byAuth = new Map<string, number[]>();
+    for (const t of tenders) {
+      if ((t.sources || []).includes("excel-comparables-seed")) continue;
+      if (!t.authority || !matchesCategory(t)) continue;
+      const dl = tsDate(t.bidDeadline);
+      const award = tsDate(t.awardDate);
+      if (!dl || !award) continue;
+      const days = Math.round((award.getTime() - dl.getTime()) / 86400000);
+      // Sanity bounds — skip absurd values
+      if (days < 0 || days > 365 * 2) continue;
+      if (!byAuth.has(t.authority)) byAuth.set(t.authority, []);
+      byAuth.get(t.authority)!.push(days);
+    }
+    return Array.from(byAuth.entries())
+      .map(([authority, days]) => ({
+        authority,
+        avgDays: Math.round(days.reduce((s, x) => s + x, 0) / days.length),
+        count: days.length,
+      }))
+      .sort((a, b) => a.avgDays - b.avgDays);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenders, category]);
+
+  // ── Re-tender / corrigendum rate per authority ──
+  // Cancellation rate is the credibility signal; corrigendum rate is the
+  // process-mess signal. Both shown together because they each tell half the
+  // story of which authorities are painful to bid against.
+  const retenderRate = useMemo(() => {
+    const byAuth = new Map<string, { total: number; cancelled: number; corrigenda: number }>();
+    for (const t of tenders) {
+      if ((t.sources || []).includes("excel-comparables-seed")) continue;
+      if (!t.authority || !matchesCategory(t)) continue;
+      if (!byAuth.has(t.authority)) byAuth.set(t.authority, { total: 0, cancelled: 0, corrigenda: 0 });
+      const s = byAuth.get(t.authority)!;
+      s.total++;
+      if (t.tenderStatus === "cancelled") s.cancelled++;
+      if (t.isCorrigendum) s.corrigenda++;
+    }
+    return Array.from(byAuth.entries())
+      .filter(([, v]) => v.total >= 2)
+      .map(([authority, v]) => ({
+        authority,
+        total: v.total,
+        cancelled: v.cancelled,
+        corrigenda: v.corrigenda,
+        cancelPct: (v.cancelled / v.total) * 100,
+        corrigendumPct: (v.corrigenda / v.total) * 100,
+      }))
+      .sort((a, b) => (b.cancelPct + b.corrigendumPct) - (a.cancelPct + a.corrigendumPct))
+      .slice(0, 12);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenders, category]);
+
   const kpis = useMemo(() => {
     const pipelineMW = activeAll.reduce((s, t) => s + (t.powerMW || 0), 0);
     const pipelineMWh = activeAll.reduce((s, t) => s + (t.energyMWh || 0), 0);
@@ -586,6 +664,58 @@ function AnalyticsContent() {
                 )}
               </Panel>
             </div>
+
+            {/* Row 4: Geography & authority intelligence */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <Panel
+                title="State tariff heatmap"
+                subtitle="Median ₹/MW/Month per state across awarded tenders. Green = lucrative to win, red = thin margin."
+              >
+                {stateTariffs.length === 0 ? (
+                  <Empty hint="Need awarded tenders with state + tariff." />
+                ) : (
+                  <ColoredBars
+                    data={stateTariffs.map((s) => ({
+                      label: s.state,
+                      value: s.median,
+                      formatted: fmtTariff(s.median),
+                      meta: `${s.count} award${s.count === 1 ? "" : "s"}`,
+                    }))}
+                    higherIsBetter
+                  />
+                )}
+              </Panel>
+
+              <Panel
+                title="Authority responsiveness"
+                subtitle="Avg days from bid deadline → award per authority. Green = fast, red = slow."
+              >
+                {authorityResponsiveness.length === 0 ? (
+                  <Empty hint="Need tenders with both a bid deadline and an award date." />
+                ) : (
+                  <ColoredBars
+                    data={authorityResponsiveness.map((a) => ({
+                      label: a.authority,
+                      value: a.avgDays,
+                      formatted: `${a.avgDays}d`,
+                      meta: `${a.count} closed tender${a.count === 1 ? "" : "s"}`,
+                    }))}
+                    higherIsBetter={false}
+                  />
+                )}
+              </Panel>
+            </div>
+
+            <Panel
+              title="Re-tender rate per authority"
+              subtitle="% cancelled + % corrigendum-issued per authority. High numbers = credibility risk — repeated process churn."
+            >
+              {retenderRate.length === 0 ? (
+                <Empty />
+              ) : (
+                <RetenderTable data={retenderRate} />
+              )}
+            </Panel>
           </>
         )}
       </div>
@@ -1140,6 +1270,113 @@ function HorizontalBars({
           </div>
         );
       })}
+    </div>
+  );
+}
+
+function ColoredBars({
+  data, higherIsBetter,
+}: {
+  data: Array<{ label: string; value: number; formatted?: string; meta?: string }>;
+  higherIsBetter: boolean;
+}) {
+  if (data.length === 0) return <Empty />;
+  const values = data.map((d) => d.value).filter((v) => Number.isFinite(v));
+  const lo = Math.min(...values);
+  const hi = Math.max(...values);
+  const span = Math.max(hi - lo, 1);
+  // Map value → red/amber/green. Higher is better → reverse the scale.
+  const colorOf = (v: number) => {
+    const t = (v - lo) / span; // 0 = lowest, 1 = highest
+    const score = higherIsBetter ? t : 1 - t;
+    if (score >= 0.66) return "#10b981"; // good
+    if (score >= 0.33) return "#f59e0b"; // mid
+    return "#ef4444";                     // bad
+  };
+  return (
+    <div className="space-y-2">
+      {data.map((d, i) => {
+        const pct = hi > 0 ? (d.value / hi) * 100 : 0;
+        return (
+          <div key={i} className="text-xs">
+            <div className="flex items-baseline justify-between mb-1">
+              <span className="font-medium text-gray-100 truncate" title={d.label}>{d.label}</span>
+              <span className="font-semibold text-gray-100 ml-2 shrink-0">{d.formatted ?? d.value.toLocaleString()}</span>
+            </div>
+            <div className="bg-[var(--bg-subtle)] rounded h-3 relative overflow-hidden mb-1">
+              <div className="h-full" style={{ width: `${Math.max(pct, 2)}%`, background: colorOf(d.value) }} />
+            </div>
+            {d.meta && <div className="text-[10px] text-gray-500">{d.meta}</div>}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function RetenderTable({
+  data,
+}: {
+  data: Array<{ authority: string; total: number; cancelled: number; corrigenda: number; cancelPct: number; corrigendumPct: number }>;
+}) {
+  const colorPct = (pct: number) => {
+    if (pct === 0) return "#10b981";
+    if (pct < 10) return "#f59e0b";
+    return "#ef4444";
+  };
+  // Find a meaningful denominator for bar widths so a 50% cell isn't a full bar
+  const maxPct = Math.max(20, ...data.map((d) => Math.max(d.cancelPct, d.corrigendumPct)));
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-xs">
+        <thead className="text-left text-gray-500 uppercase tracking-wider">
+          <tr>
+            <th className="py-2 pr-3">Authority</th>
+            <th className="py-2 pr-3 text-right">Tenders</th>
+            <th className="py-2 pr-3">% Cancelled</th>
+            <th className="py-2 pr-3">% Corrigendum-issued</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-[var(--border-subtle)]">
+          {data.map((d) => (
+            <tr key={d.authority} className="hover:bg-[var(--bg-subtle)]">
+              <td className="py-2 pr-3 text-gray-100 font-medium">{d.authority}</td>
+              <td className="py-2 pr-3 text-right text-gray-500">{d.total}</td>
+              <td className="py-2 pr-3 w-1/3">
+                <div className="flex items-center gap-2">
+                  <div className="bg-[var(--bg-subtle)] rounded h-2.5 relative overflow-hidden flex-1">
+                    <div
+                      className="h-full"
+                      style={{ width: `${Math.min(100, (d.cancelPct / maxPct) * 100)}%`, background: colorPct(d.cancelPct) }}
+                    />
+                  </div>
+                  <span className="font-semibold text-gray-100 w-12 text-right">
+                    {d.cancelPct.toFixed(0)}%
+                  </span>
+                </div>
+                {d.cancelled > 0 && <div className="text-[10px] text-gray-500 mt-0.5">{d.cancelled} of {d.total}</div>}
+              </td>
+              <td className="py-2 pr-3 w-1/3">
+                <div className="flex items-center gap-2">
+                  <div className="bg-[var(--bg-subtle)] rounded h-2.5 relative overflow-hidden flex-1">
+                    <div
+                      className="h-full"
+                      style={{ width: `${Math.min(100, (d.corrigendumPct / maxPct) * 100)}%`, background: colorPct(d.corrigendumPct) }}
+                    />
+                  </div>
+                  <span className="font-semibold text-gray-100 w-12 text-right">
+                    {d.corrigendumPct.toFixed(0)}%
+                  </span>
+                </div>
+                {d.corrigenda > 0 && <div className="text-[10px] text-gray-500 mt-0.5">{d.corrigenda} of {d.total}</div>}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="text-[11px] text-gray-400 mt-3">
+        Cancelled = tender pulled outright. Corrigendum = amendment issued mid-flight. Together they read as a credibility / process-clarity score.
+      </p>
     </div>
   );
 }
