@@ -1,0 +1,120 @@
+rules_version = '2';
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ingro-tender-dashboard — Firestore security rules.
+//
+// Published BY HAND: Firebase console → Build → Firestore Database → Rules.
+// This file is the reviewable copy; keep it in sync when you publish.
+//
+// Consumers of this project's data:
+//   • the dashboard itself (this repo)              — read/write, signed in
+//   • the scraper (scraper/index.js, GitHub Action) — writes as scraper@
+//   • the Team Console (team-ingroenergy)           — reads tenders, writes
+//       corrections + editHistory, reads/triages tenderReports
+//   • the public site (ingro-tenders-public)        — reads via the ADMIN SDK
+//       (service account, bypasses these rules) and writes tenderReports
+// ═══════════════════════════════════════════════════════════════════════════
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Only @ingroenergy.com accounts can access anything
+    function isIngroUser() {
+      return request.auth != null &&
+             request.auth.token.email.matches('.*@ingroenergy\\.com');
+    }
+
+    // Admin role check
+    function isAdmin() {
+      return isIngroUser() &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // tenders — everyone at Ingro can read and write
+    match /tenders/{tenderId} {
+      allow read: if isIngroUser();
+      allow create, update, delete: if isIngroUser();
+
+      match /editHistory/{historyId} {
+        allow read, write: if isIngroUser();
+      }
+    }
+
+    // users — can only read/write your own document
+    match /users/{userId} {
+      allow read, write: if isIngroUser() && request.auth.uid == userId;
+      allow read: if isAdmin();
+    }
+
+    // alerts
+    match /alerts/{alertId} {
+      allow read: if isIngroUser();
+      allow write: if isIngroUser();
+    }
+
+    // ingestion_log — scraper signs in as scraper@ingroenergy.com
+    match /ingestion_log/{logId} {
+      allow read: if isIngroUser();
+      allow write: if isIngroUser();
+    }
+
+    match /companies/{companyId} {
+      allow read, write: if isIngroUser();
+    }
+    match /contacts/{contactId} {
+      allow read, write: if isIngroUser();
+    }
+    match /bids/{bidId} {
+      allow read, write: if isIngroUser();
+    }
+    match /activity/{activityId} {
+      allow read, write: if isIngroUser();
+    }
+    match /employees/{employeeId} {
+      allow read, write: if isIngroUser();
+    }
+
+    match /merge_suggestions/{id} {
+      allow read, write: if request.auth != null
+        && request.auth.token.email.matches('.*@ingroenergy[.]com$');
+    }
+
+    match /tenders/{tenderId}/checklist/{itemId} {
+      allow read, write: if request.auth != null
+        && request.auth.token.email.matches('.*@ingroenergy[.]com$');
+    }
+
+    match /tenders/{tenderId}/corrigenda/{corrId} {
+      allow read, write: if request.auth != null
+        && request.auth.token.email.matches('.*@ingroenergy[.]com$');
+    }
+
+    // ── tenderReports — "this data is wrong" reports from the PUBLIC site ──
+    //
+    // NOBODY creates these from a client. The public site writes them with the
+    // firebase-admin SDK, which bypasses these rules entirely. Denying `create`
+    // here is the point: anonymous visitors can file a report through the
+    // validated, rate-limited API route WITHOUT the database ever accepting an
+    // unauthenticated write.
+    //
+    // The Team Console lists them and triages (status / assignedTo /
+    // internalNotes), then fixes the tender itself via /tenders above.
+    match /tenderReports/{reportId} {
+      allow read, update: if isIngroUser();
+      allow create: if false;
+      allow delete: if isIngroUser();  // spam cleanup
+    }
+
+    // NOTE: there is deliberately no /tenderTracking block. The Team Console
+    // keeps its pursuit-pipeline overlay in its OWN project
+    // (leads-tracking-4410a) — see team-ingroenergy/lib/tenders.ts, which reads
+    // it from `db`, not `tenderDb`. The block that used to be here called an
+    // undefined `isIngro()` and was dead weight.
+
+    // Anything not matched above is denied by default. Stated explicitly so
+    // that stays true on purpose rather than by accident.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
