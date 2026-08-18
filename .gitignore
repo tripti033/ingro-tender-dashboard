@@ -4,3 +4,14 @@ node_modules/
 .next/
 serviceAccountKey.json
 *-service-account*.json
+*BESS Tenders and Enquiries (1).xlsx
+
+# OS / editor / build noise
+.DS_Store
+tsconfig.tsbuildinfo
+
+# Working data kept locally, never committed: downloaded tender PDFs and the
+# planning/tender spreadsheets. (The specific xlsx line above predates this and
+# is now covered by *.xlsx.)
+*.pdf
+*.xlsx
