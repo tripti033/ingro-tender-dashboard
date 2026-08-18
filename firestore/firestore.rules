@@ -11,8 +11,10 @@ rules_version = '2';
 //   • the scraper (scraper/index.js, GitHub Action) — writes as scraper@
 //   • the Team Console (team-ingroenergy)           — reads tenders, writes
 //       corrections + editHistory, reads/triages tenderReports
-//   • the public site (ingro-tenders-public)        — reads via the ADMIN SDK
-//       (service account, bypasses these rules) and writes tenderReports
+//   • the public site (ingro-tenders-public)        — reads tenders and writes
+//       tenderReports from its SERVER, signed in as scraper@ (a downloadable
+//       service-account key is blocked by org policy, so it is subject to
+//       these rules like any other @ingroenergy client)
 // ═══════════════════════════════════════════════════════════════════════════
 
 service cloud.firestore {
@@ -91,17 +93,21 @@ service cloud.firestore {
 
     // ── tenderReports — "this data is wrong" reports from the PUBLIC site ──
     //
-    // NOBODY creates these from a client. The public site writes them with the
-    // firebase-admin SDK, which bypasses these rules entirely. Denying `create`
-    // here is the point: anonymous visitors can file a report through the
-    // validated, rate-limited API route WITHOUT the database ever accepting an
-    // unauthenticated write.
+    // Reports are created by the public site's SERVER, which signs in as
+    // scraper@ingroenergy.com (the org policy
+    // `iam.disableServiceAccountKeyCreation` blocks issuing a service-account
+    // key for this project, so the admin SDK is not an option here).
+    //
+    // `create` therefore requires an @ingroenergy account — an anonymous
+    // browser still cannot write. Visitors file reports through the site's
+    // validated, rate-limited /api/report route; the credential lives only in
+    // server-only code and never reaches a browser.
     //
     // The Team Console lists them and triages (status / assignedTo /
     // internalNotes), then fixes the tender itself via /tenders above.
     match /tenderReports/{reportId} {
       allow read, update: if isIngroUser();
-      allow create: if false;
+      allow create: if isIngroUser();
       allow delete: if isIngroUser();  // spam cleanup
     }
 
