@@ -1,0 +1,28 @@
+// ════════════════════════════════════════════════════════════════════════
+// tenderReports — data-correction reports from the PUBLIC tender site.
+//
+// Paste this match block into the ingro-tender-dashboard ruleset alongside
+// the existing /tenders block, then publish:
+//   Firebase console -> Build -> Firestore Database -> Rules -> Publish
+//
+// Who writes: NOBODY from a client. The public site (tenders.ingroenergy.com)
+// creates reports with the firebase-admin SDK, which bypasses rules entirely.
+// Keeping `create` denied here means an anonymous visitor can file a report
+// through the validated, rate-limited API route WITHOUT the database ever
+// accepting an unauthenticated write.
+//
+// Who reads/triages: any signed-in @ingroenergy.com account — the same gate as
+// /tenders, so the Team Console can list and work the queue.
+// ════════════════════════════════════════════════════════════════════════
+
+match /tenderReports/{reportId} {
+  // Console lists and triages (status / assignedTo / internalNotes).
+  allow read, update: if isIngroUser();
+
+  // Client creates are denied on purpose — see the note above. The public
+  // site's service account is not subject to these rules.
+  allow create: if false;
+
+  // Spam cleanup.
+  allow delete: if isIngroUser();
+}
