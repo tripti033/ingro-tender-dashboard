@@ -113,12 +113,18 @@ async function loadCandidates() {
   if (targetNit) {
     const snap = await getDoc(doc(db, "tenders", targetNit));
     if (!snap.exists()) { console.log(`Not found: ${targetNit}`); return []; }
-    return [{ nitNumber: targetNit, ...snap.data() }];
+    return [{ nitNumber: targetNit, ...snap.data(), _docId: targetNit }];
   }
   // Default: any tender with documentLink + UJVNL authority + no override
   const snap = await getDocs(collection(db, "tenders"));
   return snap.docs
-    .map((d) => ({ nitNumber: d.id, ...d.data() }))
+    // NOTE: `_docId` is the Firestore document id and is the ONLY safe key for
+    // doc()/collection() refs. The `nitNumber` FIELD is the raw NIT and may contain
+    // "/" (4 docs do, e.g. "05-01/MPPMCL/MP-UP/BESS/1149662/3377"). Because the
+    // spread puts that field back over `nitNumber: d.id`, using .nitNumber in a ref
+    // builds a nested path — failing with "must have an even/odd number of
+    // segments", or PERMISSION_DENIED when the segment count happens to be legal.
+    .map((d) => ({ nitNumber: d.id, ...d.data(), _docId: d.id }))
     .filter((t) => t.authority === "UJVNL" && t.documentLink && (force || !t.pdfTextOverride));
 }
 
@@ -144,7 +150,7 @@ for (let i = 0; i < candidates.length; i++) {
   }
   console.log(`  → ${text.length.toLocaleString()} chars OCRed. Sample: ${text.slice(0, 150).replace(/\s+/g, " ")}…`);
 
-  await updateDoc(doc(db, "tenders", t.nitNumber), {
+  await updateDoc(doc(db, "tenders", t._docId), {
     pdfTextOverride: text.slice(0, 100000), // Firestore field limit guard
     pdfTextOverrideAt: Timestamp.now(),
     pdfTextOverrideBy: "gemini-vision-ocr",

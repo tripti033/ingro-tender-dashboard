@@ -222,15 +222,21 @@ async function loadCandidates() {
       console.log(`Tender ${targetNit} not found`);
       return [];
     }
-    return [{ nitNumber: targetNit, ...snap.data() }];
+    return [{ nitNumber: targetNit, ...snap.data(), _docId: targetNit }];
   }
   const snap = await getDocs(collection(db, "tenders"));
-  const all = snap.docs.map((d) => ({ nitNumber: d.id, ...d.data() }));
+  // NOTE: `_docId` is the Firestore document id and is the ONLY safe key for
+  // doc()/collection() refs. The `nitNumber` FIELD is the raw NIT and may contain
+  // "/" (4 docs do, e.g. "05-01/MPPMCL/MP-UP/BESS/1149662/3377"). Because the
+  // spread puts that field back over `nitNumber: d.id`, using .nitNumber in a ref
+  // builds a nested path — failing with "must have an even/odd number of
+  // segments", or PERMISSION_DENIED when the segment count happens to be legal.
+  const all = snap.docs.map((d) => ({ nitNumber: d.id, ...d.data(), _docId: d.id }));
   const out = [];
   for (const t of all) {
     if (!t.documentLink) continue;
     if (!forceAll) {
-      const cl = await getDocs(collection(db, "tenders", t.nitNumber, "checklist"));
+      const cl = await getDocs(collection(db, "tenders", t._docId, "checklist"));
       if (cl.size > 0) continue;
     }
     out.push(t);
@@ -323,7 +329,7 @@ async function main() {
     if (choice === "y") {
       // Re-running with --all or on the same NIT? Wipe the existing checklist
       // so we don't duplicate items when the new prompt produces better output.
-      const existing = await getDocs(collection(db, "tenders", t.nitNumber, "checklist"));
+      const existing = await getDocs(collection(db, "tenders", t._docId, "checklist"));
       if (existing.size > 0) {
         for (const d of existing.docs) await deleteDoc(d.ref);
         console.log(`  ${DIM}(cleared ${existing.size} old items first)${RESET}`);
@@ -333,7 +339,7 @@ async function main() {
       for (const it of items) {
         const b = normaliseBucket(it.bucket);
         bucketOrder[b] += 10;
-        await addDoc(collection(db, "tenders", t.nitNumber, "checklist"), {
+        await addDoc(collection(db, "tenders", t._docId, "checklist"), {
           bucket: b,
           order: bucketOrder[b],
           document: String(it.document).slice(0, 500),

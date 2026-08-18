@@ -87,7 +87,13 @@ async function main() {
 
   // Load all tenders
   const snap = await getDocs(collection(db, "tenders"));
-  const allTenders = snap.docs.map((d) => ({ nitNumber: d.id, ...d.data() }));
+  // NOTE: `_docId` is the Firestore document id and is the ONLY safe key for
+  // doc()/collection() refs. The `nitNumber` FIELD is the raw NIT and may contain
+  // "/" (4 docs do, e.g. "05-01/MPPMCL/MP-UP/BESS/1149662/3377"). Because the
+  // spread puts that field back over `nitNumber: d.id`, using .nitNumber in a ref
+  // builds a nested path — failing with "must have an even/odd number of
+  // segments", or PERMISSION_DENIED when the segment count happens to be legal.
+  const allTenders = snap.docs.map((d) => ({ nitNumber: d.id, ...d.data(), _docId: d.id }));
   console.log(`\nLoaded ${allTenders.length} tenders from Firestore\n`);
 
   // Filter candidates
@@ -214,7 +220,7 @@ async function main() {
       if (actuallyRan) {
         console.log(`  ${DIM}(no new fields — marking llmExtractionFailed)${RESET}`);
         try {
-          await updateDoc(doc(db, "tenders", tender.nitNumber), {
+          await updateDoc(doc(db, "tenders", tender._docId), {
             llmExtractionFailed: true,
             llmExtractionAttemptedAt: Timestamp.now(),
           });
@@ -248,7 +254,7 @@ async function main() {
 
     if (choice === "y") {
       try {
-        await updateDoc(doc(db, "tenders", tender.nitNumber), {
+        await updateDoc(doc(db, "tenders", tender._docId), {
           ...updates,
           llmExtractionFailed: false,
           llmExtractionAttemptedAt: Timestamp.now(),

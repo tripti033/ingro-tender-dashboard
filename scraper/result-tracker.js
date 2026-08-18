@@ -202,7 +202,13 @@ async function main() {
   }
 
   const snap = await getDocs(collection(db, "tenders"));
-  const allTenders = snap.docs.map((d) => ({ nitNumber: d.id, ...d.data() }));
+  // NOTE: `_docId` is the Firestore document id and is the ONLY safe key for
+  // doc()/collection() refs. The `nitNumber` FIELD is the raw NIT and may contain
+  // "/" (4 docs do, e.g. "05-01/MPPMCL/MP-UP/BESS/1149662/3377"). Because the
+  // spread puts that field back over `nitNumber: d.id`, using .nitNumber in a ref
+  // builds a nested path — failing with "must have an even/odd number of
+  // segments", or PERMISSION_DENIED when the segment count happens to be legal.
+  const allTenders = snap.docs.map((d) => ({ nitNumber: d.id, ...d.data(), _docId: d.id }));
   const targetNit = process.argv[2];
 
   const candidates = allTenders.filter((t) => {
@@ -266,7 +272,7 @@ async function main() {
     const sources = Array.isArray(result.sources) ? result.sources.slice(0, 10) : [];
     if (sources.length > 0) console.log(`    Sources: ${sources.map((s) => s.url).join(", ")}`);
 
-    await updateDoc(doc(db, "tenders", tender.nitNumber), {
+    await updateDoc(doc(db, "tenders", tender._docId), {
       awardedTo,
       developedBy: (result.developer && result.developer !== "null") ? result.developer : null,
       tenderStatus: "awarded",
