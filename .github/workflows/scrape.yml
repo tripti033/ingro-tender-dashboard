@@ -42,3 +42,25 @@ jobs:
       - name: Generate company merge suggestions
         run: node scraper/suggest-merges.js
         continue-on-error: true
+
+      # The public site caches the tender list for an hour to keep Firestore
+      # reads flat under crawler traffic. This tells it to drop that cache now,
+      # so a tender scraped above is live within seconds instead of up to an
+      # hour later. Never fails the run: the scrape itself already succeeded,
+      # and without this the site still refreshes on its own schedule.
+      - name: Refresh the public site
+        continue-on-error: true
+        env:
+          REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
+          SITE_URL: https://tenders.ingroenergy.com
+        run: |
+          if [ -z "$REVALIDATE_SECRET" ]; then
+            echo "REVALIDATE_SECRET is not set — skipping."
+            echo "The site will still pick up new tenders within the hour."
+            exit 0
+          fi
+          # No trailing command after this: curl's exit code must be the
+          # step's, or a failed refresh would still report green.
+          curl -fsS --max-time 30 -X POST \
+            -H "Authorization: Bearer $REVALIDATE_SECRET" \
+            "$SITE_URL/api/revalidate"
