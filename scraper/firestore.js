@@ -15,6 +15,7 @@ import {
   signInWithEmailAndPassword,
 } from "firebase/auth";
 import { findParentNit } from "./corrigendum.js";
+import { newTenderVerification, reflagVerification, meaningfulChanges } from "./verification.js";
 
 let db = null;
 let authenticated = false;
@@ -84,6 +85,7 @@ export async function writeTenders(tenders) {
   let updatedCount = 0;
   let skippedCount = 0;
   let corrigendaLinked = 0;
+  let reflaggedCount = 0;
   const errors = [];
 
   // One-time load of every existing tender so we can resolve parent NITs for
@@ -186,11 +188,13 @@ export async function writeTenders(tenders) {
       }
 
       if (!docSnap.exists()) {
-        // New tender — write full document
+        // New tender — write full document. Nothing scraped is trusted until a
+        // human signs it off, so it enters the review queue immediately.
         await setDoc(docRef, {
           ...tender,
           firstSeenAt: now,
           lastUpdatedAt: now,
+          ...newTenderVerification(now),
         });
         newCount++;
       } else {
@@ -265,8 +269,19 @@ export async function writeTenders(tenders) {
         }
 
         if (hasChanges || mergedSources.length > (existing.sources || []).length) {
+          // Send it back for review if actual tender facts moved. A sources-only
+          // merge or a daysLeft tick is bookkeeping and must not re-flag, or the
+          // queue would never empty.
+          const reflag = reflagVerification(
+            existing,
+            meaningfulChanges(updates),
+            now,
+            "scraper",
+          );
+          if (reflag) Object.assign(updates, reflag);
           await updateDoc(docRef, updates);
           updatedCount++;
+          if (reflag) reflaggedCount++;
         } else {
           skippedCount++;
         }
@@ -279,10 +294,11 @@ export async function writeTenders(tenders) {
   }
 
   console.log(
-    `[Firestore] New: ${newCount}, Updated: ${updatedCount}, Skipped: ${skippedCount}, Corrigenda linked: ${corrigendaLinked}, Errors: ${errors.length}`
+    `[Firestore] New: ${newCount}, Updated: ${updatedCount}, Skipped: ${skippedCount}, ` +
+      `Corrigenda linked: ${corrigendaLinked}, Re-flagged for review: ${reflaggedCount}, Errors: ${errors.length}`
   );
 
-  return { newCount, updatedCount, skippedCount, corrigendaLinked, errors };
+  return { newCount, updatedCount, skippedCount, corrigendaLinked, reflaggedCount, errors };
 }
 
 /**

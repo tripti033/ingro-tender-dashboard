@@ -25,6 +25,7 @@ import { getFirestore, collection, getDocs, doc, updateDoc, Timestamp } from "fi
 import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
 import { extractTenderFields, extractPdfFields, isLlmAvailable } from "./llm.js";
 import { enrichFromPdf } from "./pdf-parser.js";
+import { reflagVerification, meaningfulChanges } from "./verification.js";
 
 // ── Firebase init ──
 
@@ -256,6 +257,8 @@ async function main() {
       try {
         await updateDoc(doc(db, "tenders", tender._docId), {
           ...updates,
+          // enrichment changed real fields -> back into the review queue
+          ...(reflagVerification(tender, meaningfulChanges(updates), Timestamp.now(), "llm-review") ?? {}),
           llmExtractionFailed: false,
           llmExtractionAttemptedAt: Timestamp.now(),
           lastUpdatedAt: Timestamp.now(),

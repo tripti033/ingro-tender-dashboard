@@ -15,6 +15,7 @@ import { initializeApp } from "firebase/app";
 import { getFirestore, collection, getDocs, doc, updateDoc, Timestamp } from "firebase/firestore";
 import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
 import { extractPdfFields, generateTenderSummary, isLlmAvailable } from "./llm.js";
+import { reflagVerification, meaningfulChanges } from "./verification.js";
 
 const USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36";
@@ -220,6 +221,7 @@ async function main() {
     try {
       await updateDoc(doc(db, "tenders", tender._docId), {
         ...updates,
+        ...(reflagVerification(tender, meaningfulChanges(updates), Timestamp.now(), "pdf-parser") ?? {}),
         lastUpdatedAt: Timestamp.now(),
       });
       enriched++;

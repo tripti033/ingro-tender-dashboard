@@ -17,6 +17,7 @@ import {
   getFirestore, collection, getDocs, doc, updateDoc, addDoc, setDoc, Timestamp,
 } from "firebase/firestore";
 import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
+import { reflagVerification, meaningfulChanges } from "./verification.js";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash-lite";
@@ -272,11 +273,16 @@ async function main() {
     const sources = Array.isArray(result.sources) ? result.sources.slice(0, 10) : [];
     if (sources.length > 0) console.log(`    Sources: ${sources.map((s) => s.url).join(", ")}`);
 
-    await updateDoc(doc(db, "tenders", tender._docId), {
+    const awardUpdates = {
       awardedTo,
       developedBy: (result.developer && result.developer !== "null") ? result.developer : null,
       tenderStatus: "awarded",
       resultSources: sources,
+    };
+    await updateDoc(doc(db, "tenders", tender._docId), {
+      ...awardUpdates,
+      // an award is a material claim about the tender — send it for review
+      ...(reflagVerification(tender, meaningfulChanges(awardUpdates), Timestamp.now(), "result-tracker") ?? {}),
       lastUpdatedAt: Timestamp.now(),
     });
     console.log(`  → Updated: awarded to ${awardedTo}`);
